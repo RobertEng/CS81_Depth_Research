@@ -1,0 +1,14 @@
+[I 15:19:16.680 NotebookApp] Serving notebooks from local directory: /Users/Robert/Documents/Caltech/CS81_Depth_Research
+[I 15:19:16.680 NotebookApp] 0 active kernels 
+[I 15:19:16.680 NotebookApp] The Jupyter Notebook is running at: http://localhost:8888/?token=64c80bb627b16bb8be0c2a3d69026cbc3ebd8666500fffd1
+[I 15:19:16.680 NotebookApp] Use Control-C to stop this server and shut down all kernels (twice to skip confirmation).
+[C 15:19:16.681 NotebookApp] 
+    
+    Copy/paste this URL into your browser when you connect for the first time,
+    to login with a token:
+        http://localhost:8888/?token=64c80bb627b16bb8be0c2a3d69026cbc3ebd8666500fffd1
+[I 15:19:16.871 NotebookApp] Accepting one-time-token-authenticated connection from ::1
+[I 18:31:34.339 NotebookApp] Kernel started: 6d648e11-26df-4d8a-89d6-f9bcbbc09e9f
+[C 11:38:23.033 NotebookApp] received signal 15, stopping
+[I 11:38:23.084 NotebookApp] Shutting down kernels
+[I 11:38:23.723 NotebookApp] Kernel shutdown: 6d648e11-26df-4d8a-89d6-f9bcbbc09e9f

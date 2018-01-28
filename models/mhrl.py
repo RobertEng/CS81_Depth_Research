@@ -15,30 +15,6 @@
 # To enable anaconda, `source activate tensorflow`
 ################################################################################
 
-# TRIED RUNNING IT FOR A BIT. TOOK A LONG TIME. ETA IN 13 HOURS ISH.
-# 78252/78252 [==============================] - 231s - loss: 0.8821 - acc: 0.1865 - val_loss: 0.6646 - val_acc: 0.3758
-# Epoch 2/200
-# 78252/78252 [==============================] - 211s - loss: 0.5810 - acc: 0.3156 - val_loss: 0.6337 - val_acc: 0.3990
-# Epoch 3/200
-# 78252/78252 [==============================] - 217s - loss: 0.5422 - acc: 0.3752 - val_loss: 0.6706 - val_acc: 0.4203
-# Epoch 4/200
-# 78252/78252 [==============================] - 247s - loss: 0.5136 - acc: 0.4109 - val_loss: 0.6423 - val_acc: 0.4406
-# Epoch 5/200
-# 78252/78252 [==============================] - 242s - loss: 0.4941 - acc: 0.4305 - val_loss: 0.6296 - val_acc: 0.4486
-# Epoch 6/200
-# 78252/78252 [==============================] - 240s - loss: 0.4806 - acc: 0.4468 - val_loss: 0.6410 - val_acc: 0.4283
-# Epoch 7/200
-# 78252/78252 [==============================] - 250s - loss: 0.4703 - acc: 0.4571 - val_loss: 0.6226 - val_acc: 0.4423
-# Epoch 8/200
-# 78252/78252 [==============================] - 282s - loss: 0.4600 - acc: 0.4640 - val_loss: 0.6249 - val_acc: 0.4607
-# Epoch 9/200
-# 78252/78252 [==============================] - 295s - loss: 0.4528 - acc: 0.4652 - val_loss: 0.6293 - val_acc: 0.4485
-# Epoch 10/200
-# 78252/78252 [==============================] - 211s - loss: 0.4442 - acc: 0.4707 - val_loss: 0.6352 - val_acc: 0.4439
-# Epoch 11/200
-# 64192/78252 [=======================>......] - ETA: 37s - loss: 0.4366 - acc: 0.4738
-
-
 import os
 import json
 import numpy as np
@@ -121,6 +97,9 @@ def normalize_data(train, test, trainlabels, testlabels):
     return train_normed, test_normed, trainlabels_normed, testlabels_normed
 
 
+
+
+
 ################################################################################
 # Models and Training
 ################################################################################
@@ -177,12 +156,12 @@ def create_mhrl_model(num_kpts):
 
     model.compile(loss='mean_squared_error',
                   optimizer='adam',
-                  metrics=['accuracy'])
+                  metrics=['mse'])
     return model
 
 def train_model(train, test, trainlabels, testlabels, model, num_epochs, use_latest_checkpoint=False):
-    filepath="../checkpoints/mhrl-{epoch:03d}-{val_acc:.2f}.hdf5"
-    checkpoint = ModelCheckpoint(filepath, monitor='val_acc', verbose=1, save_best_only=True, mode='max')
+    filepath="../checkpoints/mhrl-{epoch:03d}-{val_loss:.2f}.hdf5"
+    checkpoint = ModelCheckpoint(filepath, monitor='val_loss', verbose=1, period=10, mode='min')
     callbacks_list = [checkpoint]
 
     # If using a checkpoint, load the checkpoint and epoch
@@ -213,23 +192,23 @@ def train_model(train, test, trainlabels, testlabels, model, num_epochs, use_lat
 
 def plot_training(history):
     # summarize history for accuracy
-    plt.figure(1)
-    plt.plot(history.history['acc'])
-    plt.plot(history.history['val_acc'])
-    plt.title('model accuracy')
-    plt.ylabel('accuracy')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
+plt.figure(1)
+plt.plot(history.history['mean_squared_error'])
+plt.plot(history.history['val_mean_squared_error'])
+plt.title('model mean_squared_error')
+plt.ylabel('mean_squared_error')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
 
-    # summarize history for loss
-    plt.figure(2)
-    plt.plot(history.history['loss'])
-    plt.plot(history.history['val_loss'])
-    plt.title('model loss')
-    plt.ylabel('loss')
-    plt.xlabel('epoch')
-    plt.legend(['train', 'test'], loc='upper left')
-    plt.show()
+# summarize history for loss
+plt.figure(2)
+plt.plot(history.history['loss'])
+plt.plot(history.history['val_loss'])
+plt.title('model loss')
+plt.ylabel('loss')
+plt.xlabel('epoch')
+plt.legend(['train', 'test'], loc='upper left')
+plt.show()
 
 ################################################################################
 # Main

@@ -8,44 +8,18 @@ import pickle
 import os
 import json
 import sys
-import matplotlib.pyplot as plt
 import itertools
 import copy
-import numpy as np
-from collections import Counter, defaultdict
 import difflib
 import random
+from collections import Counter, defaultdict
+import numpy as np
 
-################################################################################
-# CONSTANTS
-################################################################################
+import matplotlib.pyplot as plt
 
-RESULT_DIR = "/Users/Robert/Documents/Caltech/CS81_Depth_Research/results"
-HUMAN_ANNOTATION_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/' \
-                       'datasets/human36m_annotations'
-COCO_ANNOTATION_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/'  \
-                      'datasets/mscoco_annotations'
-# HUMAN_ANNOTATION_DIR = '/home/ubuntu/datasets/human3.6/annotations'
-# COCO_ANNOTATION_FILE = '/home/ubuntu/datasets/mscoco/annotations'
-
-HUMAN_RAW_RESULT_FILE = "cocoa_test_completed_601_DepthHITS_2017-06-13_13-25-31.pkl"
-COCO_RAW_RESULT_FILE = "cocoa_test_completed_2400_DepthHITS_2017-06-13_13-22-13.pkl"
-HUMAN_ANNOTATION_FILE = 'human36m_train.json'
-COCO_ANNOTATION_FILE = 'person_keypoints_train2014.json'
-
-HUMAN_ANNOTATION_PATH = os.path.join(HUMAN_ANNOTATION_DIR, HUMAN_ANNOTATION_FILE)
-COCO_ANNOTATION_PATH = os.path.join(COCO_ANNOTATION_DIR, COCO_ANNOTATION_FILE)
-HUMAN_RAW_RESULT_PATH = os.path.join(RESULT_DIR, HUMAN_RAW_RESULT_FILE)
-COCO_RAW_RESULT_PATH = os.path.join(RESULT_DIR, COCO_RAW_RESULT_FILE)
-
-KEYPTS_RELATIVE_DEPTH_FILE = "human36m_601_keypts_relative_depth.json"
-KEYCMPS_RESULT_FILE = "human36m_601_keycmps.json"
-KEYPTS_RELATIVE_DEPTH_PATH = os.path.join(RESULT_DIR, KEYPTS_RELATIVE_DEPTH_FILE)
-KEYCMPS_RESULT_PATH = os.path.join(RESULT_DIR, KEYCMPS_RESULT_FILE)
-
-HUMAN_OUTPUT_FILE = "human36m_processed_data.json"
-HUMAN_OUTPUT_PATH = os.path.join(RESULT_DIR, HUMAN_OUTPUT_FILE)
-
+from constants import (HUMAN_ANNOTATION_PATH, COCO_ANNOTATION_PATH,
+    HUMAN_RAW_RESULT_PATH, COCO_RAW_RESULT_PATH, KEYPTS_RELATIVE_DEPTH_PATH,
+    KEYCMPS_RESULT_PATH, HUMAN_OUTPUT_PATH, ROTATION_MATRICES_PATH)
 
 ################################################################################
 # PROCESS FUNCTIONS
@@ -62,6 +36,9 @@ def load_data():
     Step 4: Perform helpful calculations
     Step 5: Write to a file
     '''
+    if os.path.isfile(HUMAN_OUTPUT_PATH):
+        return json.load(open(HUMAN_OUTPUT_PATH, 'r'))
+        
     ### Step 1
     data = pickle.load(open(HUMAN_RAW_RESULT_PATH, 'r'))
     print "Read in {} HIT total assignments".format(len(data['_all_assignments']))
@@ -126,12 +103,13 @@ def load_data():
     #   [3, 9], [8, 10], [9, 11], [10, 12], [11, 13]]}]
     for d in data:
         # Remove neck keypoint
+        d['annotations_truth']['kpts_2d'][2:4] = []
         d['annotations_truth']['kpts_3d'][3:6] = []
         # Grab every third kpts_3d which corresponds to depth
-        d['annotations_truth']['kpts_depth'] = d['annotations_truth']['kpts_3d'][1::3]
+        d['annotations_truth']['kpts_depth'] = d['annotations_truth']['kpts_3d'][2::3]
         d['annotations_truth']['kpts_relative_depth'] = \
             [i[0] for i in sorted(enumerate(d['annotations_truth']['kpts_depth']),
-                                  key=lambda x:x[1], reverse=True)]
+                                  key=lambda x:x[1])]
 
     ### Step 4
     # Perform helpful calculations
@@ -145,97 +123,47 @@ def load_data():
     return data
 
 
+def group_data_by_image(data_by_hit):
+    # Group hits by image. 3 Turkers were assigned the same image to annotate.
+    # Derive useful calculations from this data ie majority vote it, etc.
+    img_ids = [h['trials'][0]['img_id'] for h in data_by_hit]
+    img_ids_to_data = {img_id: [] for img_id in img_ids}
+    [img_ids_to_data[d['trials'][0]['img_id']].append(d) for d in data_by_hit]
 
-# def process_data():
-#     '''
-#     Reads in the data gathered from the GUI. Returns a consumable form with
-#     which to perform analysis on.
-#     '''
-#     data = pickle.load(open(HUMAN_RAW_RESULT_PATH, 'r'))
-#     # >>> data.keys()
-#     # ['_flagged_assignments', '_good_assignments', '_all_assignments',
-#     # '_error_assignments', '_rejected_assignments']
+    # Calculate the metaperson's annotations for this picture
+    data_by_image = []
+    for img_id, hits in img_ids_to_data.iteritems():
+        image_data = {"hits": hits}
+        metaperson = {'keypoint_comparisons_res': {}, 'img_id': img_id}
+        metaperson['annotations_truth'] = hits[0]['annotations_truth']
 
-#     print "Read in {} HIT total assignments".format(len(data['_all_assignments']))
-#     print "{} good, {} flagged, {} error, {} rejected".format(
-#         len(data['_good_assignments']), len(data['_flagged_assignments']),
-#         len(data['_error_assignments']), len(data['_rejected_assignments']))
-#     data = data['_good_assignments']
-#     # >>> data[0].keys()
-#     # ['worker_exp', 'hit_id', 'assignment_id', 'coco_subj_ids', 'hit_comment',
-#     # 'hit_it', 'worker_id', 'trials', 'gui_rating', 'response_time']
-
-#     # Get the img_ids of images annotated by turkers to match with the ground
-#     # truth data
-#     img_ids = [h['trials'][0]['img_id'] for h in data]
-
-#     # Get the ground truth annotations from human dataset
-#     with open(HUMAN_ANNOTATION_PATH) as f:
-#         _human_dataset = json.load(f)
-#     # >>> _human_dataset.keys()
-#     # [u'images', u'pose', u'annotations', u'actions']
-#     # >>> _human_dataset['images'][0].keys()
-#     # [u'c_id', u's_id', u'frame', u'height', u'width', u'video', u'filename', u'id']
-#     # >>> _human_dataset['annotations'][0].keys()
-#     # [u'i_id', u's_id', u'a_id', u'kpts_2d', u'id', u'kpts_3d']
-
-#     # Match the ground truth annotations with the turker data annotations
-#     for i in range(len(_human_dataset['images'])):
-#         if _human_dataset['images'][i]['id'] in img_ids:
-#             img_id_idxes = [img_id_idx for img_id_idx, img_id in enumerate(img_ids)
-#                             if img_id == _human_dataset['images'][i]['id']]
-#             for img_id_idx in img_id_idxes:
-#                 data[img_id_idx]['images_truth'] = _human_dataset['images'][i]
-#                 data[img_id_idx]['annotations_truth'] = copy.deepcopy(_human_dataset['annotations'][i])
-
-#     print "{} images in human3.6 dataset".format(len(_human_dataset['images']))
-#     print "{} annotations matched with ground truth".format(len(data))
-
-#     # Remove the neck keypoint. Arrange the depth data in a useful way.
-#     # >>> _human_dataset['pose']
-#     # [{u'original_index': [15, 13, 17, 25, 18, 26, 19, 27, 6, 1, 7, 2, 8, 3],
-#     # u'keypoints': [u'head', u'neck', u'left_shoulder', u'right_shoulder',
-#     #   u'left_elbow', u'right_elbow', u'left_wrist', u'right_wrist', u'left_hip',
-#     #   u'right_hip', u'left_knee', u'right_knee', u'left_ankle', u'right_ankle'],
-#     # u'skeleton': [[0, 1], [1, 2], [1, 3], [2, 4], [3, 5], [4, 6], [5, 7], [2, 8],
-#     #   [3, 9], [8, 10], [9, 11], [10, 12], [11, 13]]}]
-#     for d in data:
-#         # Remove neck keypoint
-#         d['annotations_truth']['kpts_3d'][3:6] = []
-#         # Grab every third kpts_3d which corresponds to depth
-#         d['annotations_truth']['kpts_depth'] = d['annotations_truth']['kpts_3d'][1::3]
-#         d['annotations_truth']['kpts_relative_depth'] = \
-#             [i[0] for i in sorted(enumerate(d['annotations_truth']['kpts_depth']),
-#                                   key=lambda x:x[1], reverse=True)]
-#         print len(d['annotations_truth']['kpts_3d'])
-
-#     if not os.path.isfile(KEYPTS_RELATIVE_DEPTH_PATH):
-#         ## DUMP KEYPOINTCOMARPISONS ORDER AND RES TO FILE TO BE READ BY JS
-#         keycmp_orders = [h['trials'][0]['depth']['keypoint_comparisons_order'] for h in data]
-#         keycmp_reses = [h['trials'][0]['depth']['keypoint_comparisons_res'] for h in data]
-#         keycmps = {'keycmp_orders': keycmp_orders, 'keycmp_reses': keycmp_reses}
-
-#         with open(KEYCMPS_RESULT_PATH, 'w') as f:
-#             f.write(json.dumps(keycmps))
-#         print "Output keypoint comparisons to {}".format(KEYCMPS_RESULT_PATH)
-#         sys.exit()
-
-#     _relative_depth = json.load(open(KEYPTS_RELATIVE_DEPTH_PATH, 'r'))
-#     for d, kpts_relative_depth in zip(data, _relative_depth):
-#         d['trials'][0]['kpts_relative_depth'] = kpts_relative_depth
-#     print "Relative depth ordering for Turkers associated with the data"
-
-#     with open(HUMAN_OUTPUT_PATH, 'w') as f:
-#         json.dump(data, f)
-#     print "Output data to {}".format(HUMAN_OUTPUT_PATH)
+        # For each comp, get the majority vote
+        for comp in hits[0]['trials'][0]['depth']['keypoint_comparisons_res'].keys():
+            votes = []
+            for m in hits:
+                # If this comparison doesn't exists in this hit, then calculate it.
+                if comp not in m['trials'][0]['depth']['keypoint_comparisons_res']:
+                    kpt1, kpt2 = [int(_k) for _k in comp.split(',')]
+                    m['trials'][0]['depth']['keypoint_comparisons_res'][comp] = np.sign(m['trials'][0]['kpts_relative_depth'].index(kpt2) - m['trials'][0]['kpts_relative_depth'].index(kpt1))
+                # Add it to votes
+                votes.append(m['trials'][0]['depth']['keypoint_comparisons_res'][comp])
+            metaperson['keypoint_comparisons_res'][comp] = find_majority(votes)
+        image_data['metaperson'] = metaperson
+        data_by_image.append(image_data)
+    return data_by_image
 
 
-# If the processed form of the data doesn't exist, then create it
-if not os.path.isfile(HUMAN_OUTPUT_PATH):
-    # process_data()
-    load_data()
+def group_data_by_worker(data_by_hit):
+    # Group hits by worker.
+    worker_ids = set([h['worker_id'] for h in data_by_hit])
+    worker_id_to_data = {worker_id: [] for worker_id in worker_ids}
+    [worker_id_to_data[d['worker_id']].append(d) for d in data_by_hit]
 
-data = json.load(open(HUMAN_OUTPUT_PATH, 'r'))
+    data_by_worker = []
+    for worker_id, hits in worker_id_to_data.iteritems():
+        worker_data = {"hits": hits}
+        data_by_worker.append(worker_data)
+    return data_by_worker
 
 
 def calculate_naive_score(d):
@@ -266,14 +194,6 @@ def find_majority(votes):
     return top_two[0][0]
 
 
-def group_data_by_image(data):
-    # Group hits by image. 3 Turkers were assigned the same image to annotate. Majority vote it.
-    # Group data by image.
-    img_ids = [h['trials'][0]['img_id'] for h in data]
-    img_ids_to_data = {img_id: [] for img_id in img_ids}
-    [img_ids_to_data[d['trials'][0]['img_id']].append(d) for d in data]
-    return img_ids_to_data
-
 
 def get_keypoint_comparison_depths(data, threshold):
     kpt_pair_dist_incorrect_lbl = []
@@ -291,7 +211,7 @@ def get_keypoint_comparison_depths(data, threshold):
             kpt1, kpt2 = [int(_k) for _k in comp.split(',')]
             kpt1_depth = kpts_depth[kpts_relative_depth.index(kpt1)]
             kpt2_depth = kpts_depth[kpts_relative_depth.index(kpt2)]
-            depth_diff = kpt2_depth - kpt1_depth
+            depth_diff = kpt1_depth - kpt2_depth
 
             # Collect whatever data is needed for the graphs
             # If the comparison was correct
@@ -313,6 +233,21 @@ def get_keypoint_comparison_depths(data, threshold):
             kpt_pair_dist_correct_lbl,
             kpt_pair_dist_incorrect_lbl_gen_comps,
             kpt_pair_dist_correct_lbl_gen_comps)
+
+
+def lookup_hits_from_file_names(data, file_names):
+    '''
+    NOTE: One caveat is it only takes one of the annotations for the image
+    rather than all of them.
+    '''
+    hits = []
+    files_seen = set()
+    for d in data:
+        if (d['images_truth']['filename'] in file_names
+                and d['images_truth']['filename'] not in files_seen):
+            files_seen.add(d['images_truth']['filename'])
+            hits.append(d)
+    return hits
 
 
 def lookup_file_names_from_img_ids(img_ids):
@@ -381,6 +316,7 @@ def find_images_for_mini_experiment(data):
 
 
     # Across the images, which ones is the hardest, easiest, and median.
+    # TODO: DEPRECATED USE OF GROUP_DATA_BY_IMAGE
     img_ids_to_data = group_data_by_image(data)
     (img_id_to_correct_generated_majority_vote_comparison_count,
     img_id_to_total_generated_majority_vote_comparisons) = metaperson_comparisons(data, plots=False)
@@ -405,12 +341,26 @@ def find_images_for_mini_experiment(data):
     # random1, random2, best_performance, random3, median_performance, random4, worst_performance, random2_repeat
 
 
-################################################################################
-# VISUALIZE HITS
-################################################################################
+def get_action_data_from_human(_human_dataset, subj_ids, action, version=0):
+    # human
+    _human_dataset['images'] = [d for d in _human_dataset['images'] if d['s_id'] in subj_ids]
+    _human_dataset['annotations'] = [d for d in _human_dataset['annotations'] if d['s_id'] in subj_ids]
 
-# def visualize_HIT():
+    action_key = [_act for _act in _human_dataset['actions'] if _act['name'] == action and _act['version'] == version][0]
+    action_id = action_key['id']
+    
+    action_data_annotations = []
+    action_data_images = []
+    for d_ann, d_img in zip(_human_dataset['annotations'], _human_dataset['images']):
+        if d_ann['a_id'] == action_id:
+            action_data_annotations.append(d_ann)
+            action_data_images.append(d_img)
+    return action_data_annotations, action_data_images
 
+
+def load_rotation_matrices():
+    with open(ROTATION_MATRICES_PATH, 'r') as f:
+        print f.read()
 
 
 ################################################################################
@@ -457,7 +407,7 @@ def scores_histogram(scores):
 
 
 def worker_comparisons(data, plots=True):
-    THRESHOLD = 500 # 500mm or 50cm
+    THRESHOLD = 500  # 500mm or 50cm
     thresholds = [1000, 500, 200, 150, 100]
     for threshold in thresholds:
         worker_id_to_correct_hum_comp_count = defaultdict(int)
@@ -502,7 +452,7 @@ def worker_comparisons(data, plots=True):
             n, bins, patches = plt.hist(x, bins, facecolor='green')
             plt.xlabel('Percentage Correct during Comparisons By Worker')
             plt.ylabel('Worker Count')
-            plt.title('Human3.6m\nHuman-made Comparisons by Worker, num_workers={}, threshold={}'.format(len(worker_ids), threshold))
+            plt.title('Human3.6m Human-made Comparisons by Worker\nnum_workers={}, threshold={}'.format(len(worker_ids), threshold))
             plt.grid(True)
             # plt.show()
 
@@ -516,7 +466,7 @@ def worker_comparisons(data, plots=True):
             plt.bar(bins[:-1] + 0.05, cdf/10, width=0.1)
             plt.xlabel('Percentage Correct during Comparisons By Worker')
             plt.ylabel('Cumulative Proportion of Workers')
-            plt.title('Human3.6m\nHuman-made Comparisons by Worker CDF, num_workers={}, threshold={}'.format(len(worker_ids), threshold))
+            plt.title('Human3.6m Human-made Comparisons by Worker CDF\nnum_workers={}, threshold={}'.format(len(worker_ids), threshold))
             plt.grid(True)
             # plt.show()
 
@@ -552,36 +502,19 @@ def worker_comparisons(data, plots=True):
 
 def metaperson_comparisons(data, plots=True):
     # Group hits by image. 3 Turkers were assigned the same image to annotate. Majority vote it.
-    img_ids_to_data = group_data_by_image(data)
-
-    # Create the majority vote comparison results.
-    metapeople = []
-    for img_id, mini_data_batch in img_ids_to_data.iteritems():
-        metaperson = { 'keypoint_comparisons_res':{}, 'img_id':img_id }
-        metaperson['annotations_truth'] = mini_data_batch[0]['annotations_truth']
-
-        # For each comp, get the majority vote
-        for comp in mini_data_batch[0]['trials'][0]['depth']['keypoint_comparisons_res'].keys():
-            votes = []
-            for m in mini_data_batch:
-                # If this comparison doesn't exists in this hit, then calculate it.
-                if comp not in m['trials'][0]['depth']['keypoint_comparisons_res']:
-                    kpt1, kpt2 = [int(_k) for _k in comp.split(',')]
-                    m['trials'][0]['depth']['keypoint_comparisons_res'][comp] = np.sign(m['trials'][0]['kpts_relative_depth'].index(kpt2) - m['trials'][0]['kpts_relative_depth'].index(kpt1))
-                # Add it to votes
-                votes.append(m['trials'][0]['depth']['keypoint_comparisons_res'][comp])
-            metaperson['keypoint_comparisons_res'][comp] = find_majority(votes)
-        metapeople.append(metaperson)
+    data_by_image = group_data_by_image(data)
 
     # With majority vote comparison results, count correct and total comparisons
     # for each metaperson.
     img_id_to_correct_generated_majority_vote_comparison_count = {}
     img_id_to_total_generated_majority_vote_comparisons = {}
 
+    img_ids = set()
     THRESHOLD = 500 # 500mm or 50cm
-    for d in metapeople:
+    for d in data_by_image:
+        d = d['metaperson']
         img_id = d['img_id']
-        # img_ids.add(img_id)
+        img_ids.add(img_id)
         # human_made_comps = d['trials'][0]['depth']['keypoint_comparisons_order']
         kpts_depth = d['annotations_truth']['kpts_depth']
         kpts_relative_depth = d['annotations_truth']['kpts_relative_depth']
@@ -635,12 +568,12 @@ def wrongness(data):
     '''
     Analyze to what magnitude Turkers are wrong.
     '''
-    THRESHOLD = 500 # 500mm or 50cm
+    THRESHOLD = 500  # 500mm or 50cm
 
     (hum_kpt_pair_dist_wrong_lbl,
      hum_kpt_pair_dist_correct_lbl,
      gen_kpt_pair_dist_wrong_lbl,
-     gen_kpt_pair_dist_correct_lbl) = get_keypoint_comparison_depths(data, THRESHOLD) 
+     gen_kpt_pair_dist_correct_lbl) = get_keypoint_comparison_depths(data, THRESHOLD)
 
     hum_correct_lbl_zscores = [abs(depth / THRESHOLD) for depth in hum_kpt_pair_dist_correct_lbl]
     hum_wrong_lbl_zscores = [abs(depth / THRESHOLD) for depth in hum_kpt_pair_dist_wrong_lbl]
@@ -660,7 +593,7 @@ def wrongness(data):
     n, bins, patches = plt.hist(hum_hist_dataset, hum_bins, edgecolor='black',
                                 lw=1.2, stacked=True,
                                 label=["human incorrectly label keypoint",
-                                "human correctly label keypoint"])
+                                       "human correctly label keypoint"])
     plt.legend()
     plt.grid(True, axis='y')
 
@@ -790,11 +723,10 @@ def agreement(data, plots=True):
 
 
 
-
-# worker_comparisons(data)
-# metaperson_comparisons(data)
-# wrongness(data)
-# agreement(data)
+# worker_comparisons(data_by_hit)
+# metaperson_comparisons(data_by_hit)
+# wrongness(data_by_hit)
+# agreement(data_by_hit)
 
 # scores = [calculate_naive_score(d) for d in data]
 # scores = [calculate_dist_score(d) for d in data]

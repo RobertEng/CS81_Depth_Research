@@ -33,9 +33,9 @@ KEYCMPS_RESULT_PATH = os.path.join(RESULT_DIR, KEYCMPS_RESULT_FILE)
 HUMAN_OUTPUT_FILE = "human36m_processed_data.json"
 HUMAN_OUTPUT_PATH = os.path.join(RESULT_DIR, HUMAN_OUTPUT_FILE)
 
-ROTATION_MATRICES_PATH = "/Users/Robert/Documents/Caltech/CS81_Depth_Research/" \
-                         "datasets/human36m_original/Release-v1.1/H36M/" \
-                         "rotationmatrices.mat"
+CALTECH_OUTPUT_FILE = "human36m_processed_caltech_data.json"
+CALTECH_OUTPUT_PATH = os.path.join(RESULT_DIR, CALTECH_OUTPUT_FILE)
+
 
 
 # INTEREST_KEYPOINTS = \
@@ -54,9 +54,16 @@ ROTATION_MATRICES_PATH = "/Users/Robert/Documents/Caltech/CS81_Depth_Research/" 
 #    ['left_shoulder', 'left_hip'], ['right_shoulder', 'right_hip'],
 #    ['left_hip', 'left_knee'], ['right_hip', 'right_knee'],
 #    ['left_knee', 'left_ankle'], ['right_knee', 'right_ankle']]
+NUM_KPTS_ORIGINAL = 14
 I_ORIGINAL  = np.array([1,2,2,3,4,5,6,3,4 ,9 ,10,11,12])-1 # start points
 J_ORIGINAL  = np.array([2,3,4,5,6,7,8,9,10,11,12,13,14])-1 # end points
 LR_ORIGINAL = np.array([1,1,0,1,0,1,0,1,0,1 ,0 ,1 ,0 ], dtype=bool)
+
+NUM_KPTS_ORIGINAL_NONECK = 13
+I_ORIGINAL_NONECK  = np.array([1,1,2,3,4,5,2,3 ,8 ,9,10,11])-1 # start points
+J_ORIGINAL_NONECK  = np.array([2,3,4,5,6,7,8,9,10,11,12,13])-1 # end points
+LR_ORIGINAL_NONECK = np.array([1,0,1,0,1,0,1,0,1 ,0 ,1 ,0 ], dtype=bool)
+
 
 #####################################
 # 3d pose baseline model constants
@@ -70,4 +77,14 @@ J_BASELINE  = np.array([2,3,4,7,8,9,13,14,15,16,18,19,20,26,27,28])-1 # end poin
 LR_BASELINE = np.array([1,1,1,0,0,0,0, 0, 0, 0, 0, 0, 0, 1, 1, 1], dtype=bool)
 
 
+##############################
+# MATLAB FILES
+
+ROTATION_MATRICES_PATH = "/Users/Robert/Documents/Caltech/CS81_Depth_Research/" \
+                         "datasets/human36m_original/Release-v1.1/H36M/" \
+                         "rotationmatrices.mat"
+
+CAMERA_NAMES_PATH = "/Users/Robert/Documents/Caltech/CS81_Depth_Research/" \
+                    "datasets/human36m_original/Release-v1.1/H36M/" \
+                    "cameranames.mat"
 

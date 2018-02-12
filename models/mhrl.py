@@ -16,6 +16,7 @@
 ################################################################################
 
 import os
+import sys
 import json
 import numpy as np
 
@@ -25,6 +26,9 @@ from keras.models import Model
 from keras.callbacks import ModelCheckpoint
 
 import matplotlib.pyplot as plt
+
+sys.path.insert(0, '/Users/Robert/Documents/Caltech/CS81_Depth_Research/scripts/')
+from postprocess_original_utils import correct_lean
 
 
 ################################################################################
@@ -56,6 +60,7 @@ LIMIT = None
 def get_human_data(limit=None):
     with open(HUMAN_ANNOTATION_PATH) as f:
         _human_dataset = json.load(f)
+        correct_lean(_human_dataset)
     if limit is not None:
         train = [h['kpts_2d'] for h in _human_dataset['annotations'] if h['s_id'] in TRAIN_SUBJECTS][:LIMIT]
         test  = [h['kpts_2d'] for h in _human_dataset['annotations'] if h['s_id'] in TEST_SUBJECTS][:LIMIT]
@@ -192,23 +197,23 @@ def train_model(train, test, trainlabels, testlabels, model, num_epochs, use_lat
 
 def plot_training(history):
     # summarize history for accuracy
-plt.figure(1)
-plt.plot(history.history['mean_squared_error'])
-plt.plot(history.history['val_mean_squared_error'])
-plt.title('model mean_squared_error')
-plt.ylabel('mean_squared_error')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
+    plt.figure(1)
+    plt.plot(history.history['mean_squared_error'])
+    plt.plot(history.history['val_mean_squared_error'])
+    plt.title('model mean_squared_error')
+    plt.ylabel('mean_squared_error')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
 
-# summarize history for loss
-plt.figure(2)
-plt.plot(history.history['loss'])
-plt.plot(history.history['val_loss'])
-plt.title('model loss')
-plt.ylabel('loss')
-plt.xlabel('epoch')
-plt.legend(['train', 'test'], loc='upper left')
-plt.show()
+    # summarize history for loss
+    plt.figure(2)
+    plt.plot(history.history['loss'])
+    plt.plot(history.history['val_loss'])
+    plt.title('model loss')
+    plt.ylabel('loss')
+    plt.xlabel('epoch')
+    plt.legend(['train', 'test'], loc='upper left')
+    plt.show()
 
 ################################################################################
 # Main

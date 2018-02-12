@@ -10,22 +10,25 @@ import json
 import sys
 import itertools
 import copy
+import math
 import difflib
 import random
 from collections import Counter, defaultdict
 import numpy as np
+import scipy.io as sio
 
 import matplotlib.pyplot as plt
 
 from constants import (HUMAN_ANNOTATION_PATH, COCO_ANNOTATION_PATH,
     HUMAN_RAW_RESULT_PATH, COCO_RAW_RESULT_PATH, KEYPTS_RELATIVE_DEPTH_PATH,
-    KEYCMPS_RESULT_PATH, HUMAN_OUTPUT_PATH, ROTATION_MATRICES_PATH)
+    KEYCMPS_RESULT_PATH, HUMAN_OUTPUT_PATH, ROTATION_MATRICES_PATH,
+    CAMERA_NAMES_PATH)
 
 ################################################################################
 # PROCESS FUNCTIONS
 ################################################################################
 
-def load_data():
+def load_data(load_from_file=True):
     '''
     Reads in the data gathered from the GUI. Does basic calculations over each
     hit which may be helpful. Returns data grouped by hit.
@@ -36,7 +39,7 @@ def load_data():
     Step 4: Perform helpful calculations
     Step 5: Write to a file
     '''
-    if os.path.isfile(HUMAN_OUTPUT_PATH):
+    if load_from_file and os.path.isfile(HUMAN_OUTPUT_PATH):
         return json.load(open(HUMAN_OUTPUT_PATH, 'r'))
         
     ### Step 1
@@ -74,6 +77,7 @@ def load_data():
     # Get the ground truth annotations from human dataset
     with open(HUMAN_ANNOTATION_PATH) as f:
         _human_dataset = json.load(f)
+        correct_lean(_human_dataset)
     # >>> _human_dataset.keys()
     # [u'images', u'pose', u'annotations', u'actions']
     # >>> _human_dataset['images'][0].keys()
@@ -106,7 +110,8 @@ def load_data():
         d['annotations_truth']['kpts_2d'][2:4] = []
         d['annotations_truth']['kpts_3d'][3:6] = []
         # Grab every third kpts_3d which corresponds to depth
-        d['annotations_truth']['kpts_depth'] = d['annotations_truth']['kpts_3d'][2::3]
+        axis_to_sort = 1 # change this if it looks like we're sorting along the wrong axis
+        d['annotations_truth']['kpts_depth'] = d['annotations_truth']['kpts_3d'][axis_to_sort::3]
         d['annotations_truth']['kpts_relative_depth'] = \
             [i[0] for i in sorted(enumerate(d['annotations_truth']['kpts_depth']),
                                   key=lambda x:x[1])]
@@ -225,6 +230,8 @@ def get_keypoint_comparison_depths(data, threshold):
             else:  # Comparison was not correct
                 # If the comparison was turker made (as opposed to generated)
                 if comp in human_made_comps:
+                    if depth_diff > 600 and depth_diff < 700:
+                        print (d['annotations_truth']['i_id'])
                     kpt_pair_dist_incorrect_lbl.append(depth_diff)
                 else:  # if comparison was generated (not turker made)
                     kpt_pair_dist_incorrect_lbl_gen_comps.append(depth_diff)
@@ -359,8 +366,95 @@ def get_action_data_from_human(_human_dataset, subj_ids, action, version=0):
 
 
 def load_rotation_matrices():
-    with open(ROTATION_MATRICES_PATH, 'r') as f:
-        print f.read()
+    cam_info = sio.loadmat(ROTATION_MATRICES_PATH)['cam_info']
+    # cameras = [1, 2, 3, 4]
+    # SUBJECT_IDS   = [1,5,6,7,8,9,11]
+
+    cam_info = np.rollaxis(cam_info, 3, 0)
+    cam_info = np.rollaxis(cam_info, 3, 0)
+    return cam_info
+
+def load_camera_names():
+    cam_names = sio.loadmat(CAMERA_NAMES_PATH)['cam_names']
+    cameras = [1, 2, 3, 4]
+    return cam_names
+
+def correct_lean(_human_dataset):
+    rotation_matrices = load_rotation_matrices()
+    camera_names = load_camera_names()
+    camera_names = [int(n) for n in camera_names]
+    SUBJECT_IDS   = [1,5,6,7,8,9,11] # MUST MATCH MATLAB MATRIX
+
+    # Associate the rotation matrix with each image
+    # TODO: Refactor this loop out of this function
+    for i in range(len(_human_dataset['images'])):
+        cam_ind = camera_names.index(_human_dataset['images'][i]['c_id'])
+        subj_ind = SUBJECT_IDS.index(_human_dataset['images'][i]['s_id'])
+        _human_dataset['images'][i]["R"] = rotation_matrices[cam_ind][subj_ind].T.tolist()
+
+    # Correct the lean
+    for i in range(len(_human_dataset['images'])):
+        kpts_3d = _human_dataset['annotations'][i]['kpts_3d']
+        kpts_3d = np.reshape(kpts_3d, (len(kpts_3d) / 3, 3))
+
+        # Unapply the rotation matrix
+        kpts_3d = np.dot(kpts_3d, np.array(_human_dataset['images'][i]["R"]).T)
+        
+        # Convert the rotatioin matrix to euler angles and cancel all rotations
+        # except those about the z axis (rotates person so they're facing the
+        # camera, but eliminates tilt).
+        theta = rotationMatrixToEulerAngles(np.array(_human_dataset['images'][i]["R"]))
+        theta[0] = 0
+        theta[1] = 0
+        R = eulerAnglesToRotationMatrix(theta)
+        
+        # Apply the no-tilt rotation matrix
+        kpts_3d = np.dot(kpts_3d, R)
+
+        kpts_3d = list(kpts_3d.flatten())
+        _human_dataset['annotations'][i]['kpts_3d'] = kpts_3d
+
+# Checks if a matrix is a valid rotation matrix.
+def isRotationMatrix(R):
+  Rt = np.transpose(R)
+  shouldBeIdentity = np.dot(Rt, R)
+  I = np.identity(3, dtype = R.dtype)
+  n = np.linalg.norm(I - shouldBeIdentity)
+  return n < 1e-6
+
+# Calculates rotation matrix to euler angles
+# The result is the same as MATLAB except the order
+# of the euler angles ( x and z are swapped ).
+def rotationMatrixToEulerAngles(R):
+  assert(isRotationMatrix(R))
+  sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+  singular = sy < 1e-6
+  if  not singular :
+      x = math.atan2(R[2,1] , R[2,2])
+      y = math.atan2(-R[2,0], sy)
+      z = math.atan2(R[1,0], R[0,0])
+  else :
+      x = math.atan2(-R[1,2], R[1,1])
+      y = math.atan2(-R[2,0], sy)
+      z = 0
+  return np.array([x, y, z])
+
+# Calculates Rotation Matrix given euler angles.
+def eulerAnglesToRotationMatrix(theta) :
+  R_x = np.array([[1,         0,                  0                   ],
+                  [0,         math.cos(theta[0]), -math.sin(theta[0]) ],
+                  [0,         math.sin(theta[0]), math.cos(theta[0])  ]
+                  ])
+  R_y = np.array([[math.cos(theta[1]),    0,      math.sin(theta[1])  ],
+                  [0,                     1,      0                   ],
+                  [-math.sin(theta[1]),   0,      math.cos(theta[1])  ]
+                  ])
+  R_z = np.array([[math.cos(theta[2]),    -math.sin(theta[2]),    0],
+                  [math.sin(theta[2]),    math.cos(theta[2]),     0],
+                  [0,                     0,                      1]
+                  ])
+  R = np.dot(R_z, np.dot( R_y, R_x ))
+  return R
 
 
 ################################################################################
@@ -510,7 +604,7 @@ def metaperson_comparisons(data, plots=True):
     img_id_to_total_generated_majority_vote_comparisons = {}
 
     img_ids = set()
-    THRESHOLD = 500 # 500mm or 50cm
+    THRESHOLD = 1000 # 500mm or 50cm
     for d in data_by_image:
         d = d['metaperson']
         img_id = d['img_id']
@@ -564,66 +658,75 @@ def metaperson_comparisons(data, plots=True):
             img_id_to_total_generated_majority_vote_comparisons)
 
 
-def wrongness(data):
+def wrongness(data, absval=True, proportion=True):
     '''
     Analyze to what magnitude Turkers are wrong.
+
+    Args:
+        absval:     bool. Indicates whether to take absolute value of distances.
+        proportion: bool. Indicates whether to show proportions of correct
+                    in each bin rather than a count.
     '''
-    THRESHOLD = 500  # 500mm or 50cm
+    THRESHOLD = 500
+    BIN_WIDTH = 200
 
     (hum_kpt_pair_dist_wrong_lbl,
      hum_kpt_pair_dist_correct_lbl,
      gen_kpt_pair_dist_wrong_lbl,
      gen_kpt_pair_dist_correct_lbl) = get_keypoint_comparison_depths(data, THRESHOLD)
 
-    hum_correct_lbl_zscores = [abs(depth / THRESHOLD) for depth in hum_kpt_pair_dist_correct_lbl]
-    hum_wrong_lbl_zscores = [abs(depth / THRESHOLD) for depth in hum_kpt_pair_dist_wrong_lbl]
-    gen_correct_lbl_zscores = [abs(depth / THRESHOLD) for depth in gen_kpt_pair_dist_correct_lbl]
-    gen_wrong_lbl_zscores = [abs(depth / THRESHOLD) for depth in gen_kpt_pair_dist_wrong_lbl]
+    if absval:
+        hum_kpt_pair_dist_wrong_lbl = map(abs, hum_kpt_pair_dist_wrong_lbl)
+        hum_kpt_pair_dist_correct_lbl = map(abs, hum_kpt_pair_dist_correct_lbl)
+        gen_kpt_pair_dist_wrong_lbl = map(abs, gen_kpt_pair_dist_wrong_lbl)
+        gen_kpt_pair_dist_correct_lbl = map(abs, gen_kpt_pair_dist_correct_lbl)
 
-    hum_hist_dataset = [hum_wrong_lbl_zscores, hum_correct_lbl_zscores]
-    all_hist_dataset = [gen_wrong_lbl_zscores + hum_wrong_lbl_zscores,
-                        gen_correct_lbl_zscores + hum_correct_lbl_zscores]
+    hum_hist_dataset = [hum_kpt_pair_dist_wrong_lbl, hum_kpt_pair_dist_correct_lbl]
+    all_hist_dataset = [gen_kpt_pair_dist_wrong_lbl + hum_kpt_pair_dist_wrong_lbl,
+                        gen_kpt_pair_dist_correct_lbl + hum_kpt_pair_dist_correct_lbl]
     hum_flattened = [elem for lst in hum_hist_dataset for elem in lst]
     all_flattened = [elem for lst in all_hist_dataset for elem in lst]
-    hum_bins = max(hum_flattened) - min(hum_flattened) + 1
-    all_bins = max(all_flattened) - min(all_flattened) + 1
+    lower_bound = int(min(hum_flattened)) - int(min(hum_flattened)) % BIN_WIDTH
+    upper_bound = int(max(hum_flattened)) - int(max(hum_flattened)) % BIN_WIDTH + BIN_WIDTH
+    hum_bins = range(lower_bound, upper_bound, BIN_WIDTH)
+    lower_bound = int(min(all_flattened)) - int(min(all_flattened)) % BIN_WIDTH
+    upper_bound = int(max(all_flattened)) - int(max(all_flattened)) % BIN_WIDTH + BIN_WIDTH
+    all_bins = range(lower_bound, upper_bound, BIN_WIDTH)
 
+    if proportion:
+        # TODO: Implement this.
+        pass
 
-    hist_bar_width = (max(hum_flattened) - min(hum_flattened)) / (max(hum_flattened) - min(hum_flattened) + 1.0)
-    n, bins, patches = plt.hist(hum_hist_dataset, hum_bins, edgecolor='black',
-                                lw=1.2, stacked=True,
-                                label=["human incorrectly label keypoint",
-                                       "human correctly label keypoint"])
+    n, bins, patches = plt.hist(hum_hist_dataset, bins=hum_bins,
+                                edgecolor='black', lw=1.2, stacked=True,
+                                label=["human incorrect comparisons",
+                                       "human correct comparisons"])
     plt.legend()
     plt.grid(True, axis='y')
-
-    xtick_locs = np.arange(min(hum_flattened) + hist_bar_width / 2, max(hum_flattened) + hist_bar_width / 2, hist_bar_width)
-    xtick_lbls = range(min(hum_flattened) * THRESHOLD, max(hum_flattened) * THRESHOLD + 1, THRESHOLD)
-    plt.xticks(xtick_locs, xtick_lbls)
-
-    plt.xlabel('Absolute Distance between incorrectly labeled keypoint pairs (mm)')
+    if absval:
+        plt.xlabel('Distance between incorrectly labeled keypoint pairs (mm)')
+    else:
+        plt.xlabel('Absolute Distance between incorrectly labeled keypoint pairs (mm)')
     plt.ylabel('Number of Keypoint Pairs Comparisons')
-    num_hum_comps = len(hum_correct_lbl_zscores) + len(hum_wrong_lbl_zscores)
+    num_hum_comps = len(hum_kpt_pair_dist_wrong_lbl) + len(hum_kpt_pair_dist_correct_lbl)
     plt.title('Human3.6m, Human-made Comparisons, num_comparisons={}'.format(num_hum_comps))
-    plt.show()
 
 
-    hist_bar_width = (max(all_flattened) - min(all_flattened)) / (max(all_flattened) - min(all_flattened) + 1.0)
-    n, bins, patches = plt.hist(all_hist_dataset, all_bins, edgecolor='black',
-                                lw=1.2, stacked=True,
-                                label=["human incorrectly label keypoint",
-                                "human correctly label keypoint"])
+    plt.figure()
+    n, bins, patches = plt.hist(all_hist_dataset, bins=all_bins,
+                                edgecolor='black', lw=1.2, stacked=True,
+                                label=["human+generated incorrect comparisons",
+                                       "human+generated correct comparisons"])
     plt.legend()
     plt.grid(True, axis='y')
-
-    xtick_locs = np.arange(min(all_flattened) + hist_bar_width / 2, max(all_flattened) + hist_bar_width / 2, hist_bar_width)
-    xtick_lbls = range(min(all_flattened) * THRESHOLD, max(all_flattened) * THRESHOLD + 1, THRESHOLD)
-    plt.xticks(xtick_locs, xtick_lbls)
-
-    plt.xlabel('Absolute Distance between incorrectly labeled keypoint pairs (mm)')
+    if absval:
+        plt.xlabel('Distance between incorrectly labeled keypoint pairs (mm)')
+    else:
+        plt.xlabel('Absolute Distance between incorrectly labeled keypoint pairs (mm)')
     plt.ylabel('Number of Keypoint Pairs Comparisons')
-    num_all_comps = len(hum_correct_lbl_zscores) + len(hum_wrong_lbl_zscores) + len(gen_correct_lbl_zscores) + len(gen_wrong_lbl_zscores)
-    plt.title('Human3.6m, All Comparisons, num_comparisons={}'.format(num_all_comps))
+    num_all_comps = len(gen_kpt_pair_dist_wrong_lbl) + len(gen_kpt_pair_dist_correct_lbl) + num_hum_comps
+    plt.title('Human3.6m, Human-made Comparisons, num_comparisons={}'.format(num_all_comps))
+
     plt.show()
 
 

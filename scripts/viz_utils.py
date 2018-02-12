@@ -7,7 +7,9 @@ import matplotlib.image as mpimg
 from matplotlib.patches import Circle
 
 from constants import (HUMAN_IMAGES_DIR, I_BASELINE, J_BASELINE, LR_BASELINE,
-                       I_ORIGINAL, J_ORIGINAL, LR_ORIGINAL)
+                       I_ORIGINAL, J_ORIGINAL, LR_ORIGINAL, NUM_KPTS_ORIGINAL,
+                       NUM_KPTS_ORIGINAL_NONECK, I_ORIGINAL_NONECK,
+                       J_ORIGINAL_NONECK, LR_ORIGINAL_NONECK)
 
 sys.path.insert(0, '/Users/Robert/Documents/Caltech/CS81_Depth_Research/models/3d-pose-baseline/src')
 from viz import show3Dpose
@@ -92,9 +94,12 @@ def plot_3d_stickcoords(pts, dataset='original'):
     if dataset == 'baseline':
         I = I_BASELINE
         J = J_BASELINE
-    elif dataset == 'original':
+    elif len(pts) / 3 == NUM_KPTS_ORIGINAL and dataset == 'original':
         I = I_ORIGINAL
         J = J_ORIGINAL
+    elif len(pts) / 3 == NUM_KPTS_ORIGINAL_NONECK and dataset == 'original':
+        I = I_ORIGINAL_NONECK
+        J = J_ORIGINAL_NONECK
     ann_inds = list(set(I).union(set(J)))
 
     xs, ys, zs = [], [], []
@@ -141,9 +146,12 @@ def plot_2d_stickcoords(pts, plane='z', dataset='original'):
     if dataset == 'baseline':
         I = I_BASELINE
         J = J_BASELINE
-    elif dataset == 'original':
+    elif len(pts) / 2 == NUM_KPTS_ORIGINAL and dataset == 'original':
         I = I_ORIGINAL
         J = J_ORIGINAL
+    elif len(pts) / 2 == NUM_KPTS_ORIGINAL_NONECK and dataset == 'original':
+        I = I_ORIGINAL_NONECK
+        J = J_ORIGINAL_NONECK
     ann_inds = list(set(I).union(set(J)))
 
     xs, ys = [], []
@@ -186,46 +194,84 @@ def plot_2d_stickcoords(pts, plane='z', dataset='original'):
         ax.set_ylabel('Y Label')
 
 
-def plot_image(annotation, image, groundtruth):
-    # print groundtruth
-    ys = groundtruth[1::3]
-    print len(ys)
-    sortedys = sorted(ys, reverse=True)
+def plot_image(kpts_2d, image_filename, label=None, **kwargs):
+    '''
+    Display the image with the keypoints marked
 
-    H36M_NAMES = ['']*32
-    H36M_NAMES[0]  = 'Hip'
-    H36M_NAMES[1]  = 'RHip'
-    H36M_NAMES[2]  = 'RKnee'
-    H36M_NAMES[3]  = 'RFoot'
-    H36M_NAMES[6]  = 'LHip'
-    H36M_NAMES[7]  = 'LKnee'
-    H36M_NAMES[8]  = 'LFoot'
-    H36M_NAMES[12] = 'Spine'
-    H36M_NAMES[13] = 'Thorax'
-    H36M_NAMES[14] = 'Neck/Nose'
-    H36M_NAMES[15] = 'Head'
-    H36M_NAMES[17] = 'LShoulder'
-    H36M_NAMES[18] = 'LElbow'
-    H36M_NAMES[19] = 'LWrist'
-    H36M_NAMES[25] = 'RShoulder'
-    H36M_NAMES[26] = 'RElbow'
-    H36M_NAMES[27] = 'RWrist'
-    
-    sorted_names = []
-    for i, name in enumerate(H36M_NAMES):
-        sorted_names.append(sortedys.index(ys[i]))
-        print name + " " + str(sortedys.index(ys[i]))
-    sorted_names = sorted(sorted_names)
-    print sorted_names
+    label: image is annotated with different labels depending on value of label
+        - None: No labels printed
+        - "relative_depth": The relative depth ordering is printed from closest
+          to the camera to furthest.
+    '''
+    if label == "relative_depth" and "kpts_relative_depth" not in kwargs:
+        print ("kpts_relative_depth must be passed to plot_image.")
+        return
+    elif label == "absolute_depth" and "kpts_3d" not in kwargs:
+        print ("kpts_3d must be passed to plot_image.")
+        return
 
-    # print len(annotation['kpts_2d'])
-    # pt_anns = [order.index(i) for i in range(len(order))]
-
-    image_path = image['filename']
     plt.figure()
-    plt.imshow(imread(HUMAN_IMAGES_DIR + '/%s'%image_path))
-    plt.scatter(annotation['kpts_2d'][0::2],annotation['kpts_2d'][1::2])
+    plt.imshow(imread(HUMAN_IMAGES_DIR + '/{}'.format(image_filename)))
+    xs = kpts_2d[0::2]
+    ys = kpts_2d[1::2]
+    plt.scatter(xs, ys)
 
-    images = ["human36m_train_0000872034.jpg", "human36m_train_0000860493.jpg",
-              "human36m_train_0000963027.jpg", "human36m_train_0000074377.jpg",
-              "human36m_train_0000626565.jpg", "human36m_train_0000876351.jpg"]
+    if label == "relative_depth":
+        kpts_relative_depth = kwargs['kpts_relative_depth']
+        for kpt_id, (x, y) in enumerate(zip(xs, ys)):
+            depth_rank = kpts_relative_depth.index(kpt_id)
+            t = plt.text(x, y, str(depth_rank), color="red", fontsize=12, size='smaller')
+            t.set_bbox(dict(facecolor='green', alpha=0.5))
+    
+    elif label == "absolute_depth":
+        kpts_3d = kwargs['kpts_3d']
+        depths = map(int, kpts_3d[1::3])
+        for kpt_id, (x, y) in enumerate(zip(xs, ys)):
+            t = plt.text(x, y, str(depths[kpt_id]), color="red", fontsize=12, size='smaller')
+            t.set_bbox(dict(facecolor='green', alpha=0.5))
+
+
+
+# def plot_image(annotation, image, groundtruth):
+#     # print groundtruth
+#     ys = groundtruth[1::3]
+#     print len(ys)
+#     sortedys = sorted(ys, reverse=True)
+
+#     H36M_NAMES = ['']*32
+#     H36M_NAMES[0]  = 'Hip'
+#     H36M_NAMES[1]  = 'RHip'
+#     H36M_NAMES[2]  = 'RKnee'
+#     H36M_NAMES[3]  = 'RFoot'
+#     H36M_NAMES[6]  = 'LHip'
+#     H36M_NAMES[7]  = 'LKnee'
+#     H36M_NAMES[8]  = 'LFoot'
+#     H36M_NAMES[12] = 'Spine'
+#     H36M_NAMES[13] = 'Thorax'
+#     H36M_NAMES[14] = 'Neck/Nose'
+#     H36M_NAMES[15] = 'Head'
+#     H36M_NAMES[17] = 'LShoulder'
+#     H36M_NAMES[18] = 'LElbow'
+#     H36M_NAMES[19] = 'LWrist'
+#     H36M_NAMES[25] = 'RShoulder'
+#     H36M_NAMES[26] = 'RElbow'
+#     H36M_NAMES[27] = 'RWrist'
+    
+#     sorted_names = []
+#     for i, name in enumerate(H36M_NAMES):
+#         sorted_names.append(sortedys.index(ys[i]))
+#         print name + " " + str(sortedys.index(ys[i]))
+#     sorted_names = sorted(sorted_names)
+#     print sorted_names
+
+#     # print len(annotation['kpts_2d'])
+#     # pt_anns = [order.index(i) for i in range(len(order))]
+
+#     image_path = image['filename']
+#     plt.figure()
+#     plt.imshow(imread(HUMAN_IMAGES_DIR + '/%s'%image_path))
+#     plt.scatter(annotation['kpts_2d'][0::2],annotation['kpts_2d'][1::2])
+
+#     images = ["human36m_train_0000872034.jpg", "human36m_train_0000860493.jpg",
+#               "human36m_train_0000963027.jpg", "human36m_train_0000074377.jpg",
+#               "human36m_train_0000626565.jpg", "human36m_train_0000876351.jpg"]

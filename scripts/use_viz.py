@@ -101,7 +101,7 @@ actions = ['Directions']
 
 from constants import CALTECH_OUTPUT_PATH
 data = json.load(open(CALTECH_OUTPUT_PATH, 'r'))
-data = [d for d in data if d['_worker_id'] == 'nonAMT_368102']
+data = [d for d in data if d['_worker_id'] == 'nonAMT_687008']
 '''
 {u'Amanda Lin: nonAMT_808135',
  u'Caltech: ',
@@ -117,12 +117,12 @@ data = [d for d in data if d['_worker_id'] == 'nonAMT_368102']
 img_ids = [56833, 965922, 849671, 649263, 12750, 896082, 571176, 965922]
  '''
 img_id = 56833 # easy
-img_id = 965922 # easy
-img_id = 849671 # easy-medium
-img_id = 649263 # medium
-img_id = 12750 # hard
-img_id = 896082 # hard
-img_id = 571176 # medium
+# img_id = 965922 # easy
+# img_id = 849671 # easy-medium
+# img_id = 649263 # medium
+# img_id = 12750 # hard
+# img_id = 896082 # hard
+# img_id = 571176 # medium
 
 for _i, d in enumerate(data):
     if d['annotations_truth']['i_id'] == img_id:
@@ -137,7 +137,7 @@ plot_image(data[i]['annotations_truth']['kpts_2d'],
 plt.title("Ground Truth Ordering")
 plot_image(data[i]['annotations_truth']['kpts_2d'],
            data[i]['images_truth']['filename'], label="relative_depth",
-           kpts_relative_depth=data[i]['kpts_relative_depth'])
+           kpts_relative_depth=data[i]['trials'][0]['kpts_relative_depth'])
 plt.title("Turker Guess Ordering")
 plot_image(data[i]['annotations_truth']['kpts_2d'],
            data[i]['images_truth']['filename'], label="absolute_depth",

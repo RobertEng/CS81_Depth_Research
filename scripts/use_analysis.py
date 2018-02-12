@@ -9,7 +9,7 @@ from postprocess_original_utils import (load_data, wrongness,
     get_keypoint_comparison_depths, metaperson_comparisons, worker_comparisons)
 
 
-data = load_data()
+# data = load_data()
 
 
 from constants import CALTECH_OUTPUT_PATH
@@ -30,5 +30,5 @@ data = [d for d in data if d['_worker_id'] in lab]
 '''
 
 # wrongness(data)
-metaperson_comparisons(data)
-# worker_comparisons(data)
+# metaperson_comparisons(data)
+worker_comparisons(data)

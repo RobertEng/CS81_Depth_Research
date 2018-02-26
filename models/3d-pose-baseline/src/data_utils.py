@@ -514,8 +514,6 @@ def read_3d_data( actions, data_dir, camera_frame, rcams, predict_14=False ):
     train_root_positions: dictionary with the 3d positions of the root in train
     test_root_positions: dictionary with the 3d positions of the root in test
   """
-  print (actions)
-  sys.exit()
   # Load 3d data
   train_set = load_data( data_dir, TRAIN_SUBJECTS, actions, dim=3 )
   test_set  = load_data( data_dir, TEST_SUBJECTS,  actions, dim=3 )

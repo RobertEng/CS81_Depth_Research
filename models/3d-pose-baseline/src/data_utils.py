@@ -230,7 +230,7 @@ def normalization_stats(complete_data, dim, predict_14=False ):
   return data_mean, data_std, dimensions_to_ignore, dimensions_to_use
 
 
-def transform_world_to_camera(poses_set, cams, ncams=4, experimental=True ):
+def transform_world_to_camera(poses_set, cams, ncams=4, experimental=False ):
     """
     Project 3d poses from world coordinate to camera coordinate system
     Args

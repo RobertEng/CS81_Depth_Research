@@ -1,10 +1,10 @@
 # CS81 Depth Research
 
-## Lean in Human3.6m Dataset
+## Lean Correction in Human3.6m Dataset
+
+### The Problem
 
 The issue was raised in https://github.com/una-dinosauria/3d-pose-baseline/issues/37
-
-## Lean Correction
 
 ### Get the Rotation Matrices and Camera Names
 

@@ -7,12 +7,16 @@ from __future__ import print_function
 
 from tensorflow.python.ops import variable_scope as vs
 
+import sys
 import os
 import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 import data_utils
 import cameras as cam
+
+sys.path.insert(0, '/Users/Robert/Documents/Caltech/CS81_Depth_Research/scripts')
+from loss import preloss_tf
 
 def kaiming(shape, dtype, partition_info=None):
   """Kaiming initialization as described in https://arxiv.org/pdf/1502.01852.pdf
@@ -39,6 +43,7 @@ class LinearModel(object):
                max_norm,
                batch_size,
                learning_rate,
+               num_loss_pairs,
                summaries_dir,
                predict_14=False,
                dtype=tf.float32):
@@ -73,6 +78,7 @@ class LinearModel(object):
 
     self.input_size  = self.HUMAN_2D_SIZE
     self.output_size = self.HUMAN_3D_SIZE
+    self.num_loss_pairs = num_loss_pairs
 
     self.isTraining = tf.placeholder(tf.bool,name="isTrainingflag")
     self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
@@ -95,9 +101,11 @@ class LinearModel(object):
       # in=2d poses, out=3d poses
       enc_in  = tf.placeholder(dtype, shape=[None, self.input_size], name="enc_in")
       dec_out = tf.placeholder(dtype, shape=[None, self.output_size], name="dec_out")
+      loss_pairs = tf.placeholder(tf.int32, shape=[None, self.num_loss_pairs], name="loss_pairs")
 
       self.encoder_inputs  = enc_in
       self.decoder_outputs = dec_out
+      self.loss_pairs      = loss_pairs
 
     # === Create the linear + relu combos ===
     with vs.variable_scope( "linear_model" ):
@@ -127,14 +135,13 @@ class LinearModel(object):
     # Store the outputs here
     self.outputs = y
     # self.loss = tf.reduce_mean(tf.square(y - dec_out))
-    num_pts = int(self.HUMAN_3D_SIZE / 3)
-    self.pairs = tf.convert_to_tensor([(i, j) for i in range(num_pts) for j in range(num_pts) if i != j])
+    # num_pts = int(self.HUMAN_3D_SIZE / 3)
+    # self.pairs = tf.convert_to_tensor([(i, j) for i in range(num_pts) for j in range(num_pts) if i != j])
     #print (tf.size(self.pairs))
-    self.pairs = tf.Print(self.pairs,[self.pairs],message="something")
-    self.pairs.eval()
-    self.pairs_range = range(tf.size(self.pairs).eval() / 2)
-    self.loss = ranking_loss(y, dec_out)
-    self.loss = loss_tf(pred, r)
+    # self.pairs = tf.Print(self.pairs,[self.pairs],message="something")
+    # self.pairs.eval()
+    # self.pairs_range = range(tf.size(self.pairs).eval() / 2)
+    self.loss = preloss_tf(y, dec_out, loss_pairs)
     self.loss_summary = tf.summary.scalar('loss/loss', self.loss)
 
     # To keep track of the loss in mm
@@ -208,7 +215,7 @@ class LinearModel(object):
 
     return y
 
-  def step(self, session, encoder_inputs, decoder_outputs, dropout_keep_prob, isTraining=True):
+  def step(self, session, encoder_inputs, decoder_outputs, loss_pairs, dropout_keep_prob, isTraining=True):
     """Run a step of the model feeding the given inputs.
 
     Args
@@ -230,6 +237,7 @@ class LinearModel(object):
 
     input_feed = {self.encoder_inputs: encoder_inputs,
                   self.decoder_outputs: decoder_outputs,
+                  self.loss_pairs: loss_pairs,
                   self.isTraining: isTraining,
                   self.dropout_keep_prob: dropout_keep_prob}
 
@@ -295,17 +303,25 @@ class LinearModel(object):
       encoder_inputs  = encoder_inputs[idx, :]
       decoder_outputs = decoder_outputs[idx, :]
 
+    # Generate the loss pairs
+    num_pts = int(self.HUMAN_3D_SIZE / 3)
+    pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i < j])
+    pair_idxs = [np.random.choice(len(pairs), self.num_loss_pairs) for _ in range(n)]
+    loss_pairs = np.take(pairs, pair_idxs, axis=0)
+
     # Make the number of examples a multiple of the batch size
     n_extra  = n % self.batch_size
     if n_extra > 0:  # Otherwise examples are already a multiple of batch size
       encoder_inputs  = encoder_inputs[:-n_extra, :]
       decoder_outputs = decoder_outputs[:-n_extra, :]
+      loss_pairs      = loss_pairs[:-n_extra, :]
 
     n_batches = n // self.batch_size
     encoder_inputs  = np.split( encoder_inputs, n_batches )
     decoder_outputs = np.split( decoder_outputs, n_batches )
+    loss_pairs      = np.split( loss_pairs, n_batches )
 
-    return encoder_inputs, decoder_outputs
+    return encoder_inputs, decoder_outputs, loss_pairs
 
   def loss_tf(pred, r):
 
@@ -333,17 +349,3 @@ class LinearModel(object):
     # loss = tf.Print(loss,[loss],message="loss ",summarize=128)
 
     return loss
-
-
-    # pair_idxs = np.random.choice(len(self.pairs), 64)
-    # ps = tf.gather(self.pairs, pair_idxs, axis=0)
-    # truth = tf.gather(dec_out, ps)
-    # pred = tf.gather(y, ps)
-    # r = tf.sign(truth[:,0] - truth[:,1], dtype=float)
-    
-    # # Writeover r = 0 case
-    # result = tf.log(1 + tf.exp(r * (pred[:,1] - pred[:,0])))
-    # goods = (r == 0)
-    # diffs = tf.square(pred[:,1] - pred[:,0])
-    # result[goods] = diffs[goods]
-    # return np.sum(result)

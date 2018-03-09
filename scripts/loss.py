@@ -6,110 +6,100 @@ import numpy as np
 import tensorflow as tf
 
 from constants import HUMAN_ANNOTATION_PATH
+# HUMAN_ANNOTATION_PATH = './human36m_corrected.json'
 BATCH_NUM_PAIRS = 64
 
-def loss_numpy(pred, ps, r):
-    pred = np.take(pred, ps)
+def loss_numpy(pred, r):
 
-    #Just the r != 0. Probably faster.
-    # return np.sum(np.log(1 + np.exp(r * np.subtract(pred[:,1], pred[:,0]))))
-
-    # np piecewise function
-    # return np.sum(np.piecewise(r, [r == 0, r != 0], [lambda r: np.square(pred[:,1] - pred[:,0]), lambda r: np.log(1 + np.exp(r * np.subtract(pred[:,1], pred[:,0])))]))    
-
-    # Writeover r = 0 case
-    result = np.log(1 + np.exp(r * (pred[:,1] - pred[:,0])))
+    squared_diff = np.square(pred[:,1] - pred[:,0])
+    loss_partial = np.log(1 + np.exp(r * (pred[:,1] - pred[:,0])))
     goods = (r == 0)
-    diffs = np.square(pred[:,1] - pred[:,0])
-    result[goods] = diffs[goods]
-    return np.sum(result)
+    loss_partial[goods] = squared_diff[goods]
+    loss = np.sum(loss_partial)
 
-def loss_tf(pred, ps, r):
+    return loss
 
-    diffs = tf.square(tf.subtract(pred[:,1], pred[:,0]))
-    # Writeover r = 0 case
-    result = tf.log(tf.add(tf.cast(1.,tf.float64), tf.exp(tf.multiply(r, diffs))))
-    goods = tf.cast(tf.where(tf.equal(r, 0.))[1],tf.int32)
-    goods = tf.Print(goods,[goods],summarize=128)
-    
-    
-    updates = tf.scatter_nd(goods,diffs,tf.shape(result))
+def loss_tf(pred, r):
 
-    mask = tf.multiply(result, tf.cast(tf.not_equal(r, 0.),tf.float64))
-    result = updates + mask
+    squared_diff = tf.square(pred[:,1] - pred[:,0])
+    # squared_diff = tf.Print(squared_diff,[squared_diff],message="squared_diff ",summarize=128)
 
-    # result = tf.scatter_nd(result, goods, diffs)
+    loss_partial = tf.reshape(tf.log(1+tf.exp(r * (pred[:,1] - pred[:,0]))),[-1,1])
+    # loss_partial = tf.Print(loss_partial,[loss_partial],message="loss_partial ", summarize=128)
 
-    return tf.reduce_sum(result)
+    good = tf.cast(tf.where(tf.equal(r, 0.)),tf.int32)
+    # good = tf.Print(good,[good],message="good ", summarize=128)
+    gathered_good = tf.reshape(tf.gather(squared_diff,good),[-1])
+    # gathered_good = tf.Print(gathered_good,[gathered_good],message="gathered_good ", summarize=128)
+    updates_gathered_good = tf.scatter_nd(good, gathered_good,  tf.shape(squared_diff))
+    # updates_gathered_good = tf.Print(updates_gathered_good,[updates_gathered_good],message="updates_gathered_good ", summarize=128)
+
+    not_good = tf.cast(tf.where(tf.not_equal(r, 0.)),tf.int32)
+    # not_good = tf.Print(not_good,[not_good],message="not_good ", summarize=128)
+    gathered_not_good = tf.reshape(tf.gather(loss_partial,not_good),[-1])
+    # gathered_not_good = tf.Print(gathered_not_good,[gathered_not_good],message="gathered_not_good ", summarize=128)
+    updates_gathered_not_good = tf.scatter_nd(not_good, gathered_not_good,  tf.shape(squared_diff))
+    # updates_gathered_not_good = tf.Print(updates_gathered_not_good,[updates_gathered_not_good],message="updates_gathered_not_good ", summarize=128)
+
+    loss = tf.reduce_sum(updates_gathered_not_good + updates_gathered_good)
+    # loss = tf.Print(loss,[loss],message="loss ",summarize=128)
+
+    return loss
+
+def preloss_tf(y, dec_out, ps=None):
+    # dec_out is truth
+    # y is the pred
+    if ps is not None:
+        dec_out = tf.gather(dec_out, ps)
+        y = tf.gather(y, ps)
+
+    r = tf.sign(dec_out[:,0] - dec_out[:,1])
+    return loss_tf(y, r)
 
 def main():
+
+    sess = tf.InteractiveSession()
+
     with open(HUMAN_ANNOTATION_PATH) as f:
         _human_dataset = json.load(f)
 
     num_pts = len(_human_dataset['annotations'][0]['kpts_3d']) / 3
-
-    pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i != j])
-
-    np_truth = _human_dataset['annotations'][0]['kpts_3d'][1::3]
-    np_truth = np.asarray(np_truth)
-    np_truth = (np_truth - np.mean(np_truth)) / np.std(np_truth)
+    pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i < j])
+    np_truth_all = _human_dataset['annotations'][0]['kpts_3d'][1::3]
+    np_truth_all = np.asarray(np_truth_all)
+    np_truth_all = (np_truth_all - np.mean(np_truth_all)) / np.std(np_truth_all)
 
     pair_idxs = np.random.choice(len(pairs), BATCH_NUM_PAIRS)
+
     np_ps = np.take(pairs, pair_idxs, axis=0)
+    np_truth = np.take(np_truth_all, np_ps)
+    # print np_truth, "MUST CHECK THAT SAME PAIR IS NOT PICKED TWICE, i.e. [1 11] [11 1]"
 
-    np_truth = np.take(np_truth, np_ps)
-    r = np.sign(np_truth[:,0] - np_truth[:,1], dtype=float)
-    print np_truth
-    print r
+    np_r = np.sign(np_truth[:,0] - np_truth[:,1], dtype=float)
+    # np_r[np.random.randint(64, size=np.random.randint(10))] = 0
 
-    print loss_numpy(np_truth, np_ps, r)
+    # numpy loss
+    np_loss = loss_numpy(np_truth, np_r)
 
-    # sess = tf.InteractiveSession()
-    # truth = tf.placeholder("float64", [64, 2])
-    # ps = tf.placeholder("float64", [64, 2])
-    with tf.Session() as sess:
-        truth = tf.convert_to_tensor(np_truth)
-        
-        ps = tf.convert_to_tensor(np_ps)
-        sub = tf.subtract(tf.slice(truth, [0,0],[64, 1]), tf.slice(truth, [0,1],[64, 1]))
-        r = tf.sign(sub)
+    # convert numpy arrays to tf tensors
+    tf_truth_all = tf.convert_to_tensor(np_truth_all)
+    tf_truth = tf.convert_to_tensor(np_truth)
+    # tf_truth = tf.Print(tf_truth,[tf_truth],message="tf_truth ",summarize=128)
+    tf_r = tf.convert_to_tensor(np_r)
+    # tf_r = tf.Print(tf_r,[tf_r],message="tf_r ",summarize=128)
+    tf_ps = tf.convert_to_tensor(np_ps)
+    # tf_ps = tf.Print(tf_ps,[tf_ps],message="tf_ps ",summarize=128)
+    tf_pairs = tf.convert_to_tensor(pairs)
 
-        # truth = tf.Print(truth, [truth], message="truth ", summarize=128)
-        # ps = tf.Print(ps, [ps], message="ps ", summarize=128)
-        # r = tf.Print(r, [r], message="r ", summarize=128)
+    # tf loss
+    # tf_loss = preloss_tf(tf_truth_all, tf_truth_all, ps=tf_ps)
+    tf_loss = preloss_tf(tf_truth_all, tf_truth_all, ps=pairs)
+    # tf_loss = loss_tf(tf_truth, tf_r)
+    tf_loss = sess.run([tf_loss])
 
-        # tf_loss = loss_tf(truth, ps, r)
+    print np_loss, tf_loss
 
-        diffs = tf.square(sub)
-        diffs = tf.Print(diffs,[diffs],message="diffs",summarize=128)
-        print("diffs")
-        print(diffs.shape)
-        
-        result = tf.log(tf.add(tf.cast(1.,tf.float64), tf.exp(tf.multiply(r, diffs))))
-        result = tf.Print(result,[result],message="result",summarize=128)
-        print("results")
-        print(result.shape)
-
-        goods = tf.reshape(tf.where(tf.not_equal(r, 0.)),[-1,2])
-        goods = tf.Print(goods,[goods],message="goods",summarize=128)
-        print("goods")
-        print(goods.shape)
-        
-        # updates = tf.scatter_nd(goods,diffs,result.shape)
-        # updates = tf.Print(updates,[updates],message="updates",summarize=128)
-        # print("updates")
-        # print(updates.shape)
-
-        # mask = tf.multiply(result, tf.cast(tf.not_equal(r, 0.),tf.float64))
-        # result = updates + mask
-
-        # result = tf.scatter_nd(result, goods, diffs)
-
-        # tf_loss = tf.reduce_sum(result)
-
-        sess.run([diffs, result, goods])
-        # sess.run(result,feed_dict={truth: np_truth, ps: np_ps})
-
+    print "Done"
 
 if __name__ == '__main__':
     main()

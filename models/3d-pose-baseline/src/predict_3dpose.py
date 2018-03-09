@@ -45,6 +45,7 @@ tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connec
 # Evaluation
 tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at test time")
 tf.app.flags.DEFINE_boolean("evaluateActionWise",False, "The dataset to use either h36m or heva")
+tf.app.flags.DEFINE_integer("num_loss_pairs", 64, "Number of pairs to evaluate loss with")
 
 # Directories
 tf.app.flags.DEFINE_string("cameras_path","data/h36m/cameras.h5","Directory to load camera parameters")
@@ -105,6 +106,7 @@ def create_model( session, actions, batch_size ):
       FLAGS.max_norm,
       batch_size,
       FLAGS.learning_rate,
+      FLAGS.num_loss_pairs,
       summaries_dir,
       FLAGS.predict_14,
       dtype=tf.float16 if FLAGS.use_fp16 else tf.float32)
@@ -185,7 +187,7 @@ def train():
       current_epoch = current_epoch + 1
 
       # === Load training batches for one epoch ===
-      encoder_inputs, decoder_outputs = model.get_all_batches( train_set_2d, train_set_3d, FLAGS.camera_frame, training=True )
+      encoder_inputs, decoder_outputs, loss_pairs = model.get_all_batches( train_set_2d, train_set_3d, FLAGS.camera_frame, training=True )
       nbatches = len( encoder_inputs )
       print("There are {0} train batches".format( nbatches ))
       start_time, loss = time.time(), 0.
@@ -197,8 +199,8 @@ def train():
           # Print progress every log_every_n_batches batches
           print("Working on epoch {0}, batch {1} / {2}... ".format( current_epoch, i+1, nbatches), end="" )
 
-        enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
-        step_loss, loss_summary, lr_summary, _ =  model.step( sess, enc_in, dec_out, FLAGS.dropout, isTraining=True )
+        enc_in, dec_out, loss_ps = encoder_inputs[i], decoder_outputs[i], loss_pairs[i]
+        step_loss, loss_summary, lr_summary, _ =  model.step( sess, enc_in, dec_out, loss_ps, FLAGS.dropout, isTraining=True )
 
         if (i+1) % log_every_n_batches == 0:
           # Log and print progress every log_every_n_batches batches
@@ -235,12 +237,12 @@ def train():
           # Get 2d and 3d testing data for this action
           action_test_set_2d = get_action_subset( test_set_2d, action )
           action_test_set_3d = get_action_subset( test_set_3d, action )
-          encoder_inputs, decoder_outputs = model.get_all_batches( action_test_set_2d, action_test_set_3d, FLAGS.camera_frame, training=False)
+          encoder_inputs, decoder_outputs, loss_pairs = model.get_all_batches( action_test_set_2d, action_test_set_3d, FLAGS.camera_frame, training=False)
 
           act_err, _, step_time, loss = evaluate_batches( sess, model,
             data_mean_3d, data_std_3d, dim_to_use_3d, dim_to_ignore_3d,
             data_mean_2d, data_std_2d, dim_to_use_2d, dim_to_ignore_2d,
-            current_step, encoder_inputs, decoder_outputs )
+            current_step, encoder_inputs, decoder_outputs, loss_pairs )
           cum_err = cum_err + act_err
 
           print("{0:>6.2f}".format(act_err))
@@ -253,12 +255,12 @@ def train():
       else:
 
         n_joints = 17 if not(FLAGS.predict_14) else 14
-        encoder_inputs, decoder_outputs = model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
+        encoder_inputs, decoder_outputs, loss_pairs = model.get_all_batches( test_set_2d, test_set_3d, FLAGS.camera_frame, training=False)
 
         total_err, joint_err, step_time, loss = evaluate_batches( sess, model,
           data_mean_3d, data_std_3d, dim_to_use_3d, dim_to_ignore_3d,
           data_mean_2d, data_std_2d, dim_to_use_2d, dim_to_ignore_2d,
-          current_step, encoder_inputs, decoder_outputs, current_epoch )
+          current_step, encoder_inputs, decoder_outputs, loss_pairs, current_epoch )
 
         print("=============================\n"
               "Step-time (ms):      %.4f\n"
@@ -305,7 +307,7 @@ def get_action_subset( poses_set, action ):
 def evaluate_batches( sess, model,
   data_mean_3d, data_std_3d, dim_to_use_3d, dim_to_ignore_3d,
   data_mean_2d, data_std_2d, dim_to_use_2d, dim_to_ignore_2d,
-  current_step, encoder_inputs, decoder_outputs, current_epoch=0 ):
+  current_step, encoder_inputs, decoder_outputs, loss_pairs, current_epoch=0 ):
   """
   Generic method that evaluates performance of a list of batches.
   May be used to evaluate all actions or a single action.
@@ -324,6 +326,7 @@ def evaluate_batches( sess, model,
     current_step
     encoder_inputs
     decoder_outputs
+    loss_pairs
     current_epoch
   Returns
 
@@ -344,9 +347,9 @@ def evaluate_batches( sess, model,
     if current_epoch > 0 and (i+1) % log_every_n_batches == 0:
       print("Working on test epoch {0}, batch {1} / {2}".format( current_epoch, i+1, nbatches) )
 
-    enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
+    enc_in, dec_out, loss_ps = encoder_inputs[i], decoder_outputs[i], loss_pairs[i]
     dp = 1.0 # dropout keep probability is always 1 at test time
-    step_loss, loss_summary, poses3d = model.step( sess, enc_in, dec_out, dp, isTraining=False )
+    step_loss, loss_summary, poses3d = model.step( sess, enc_in, dec_out, loss_ps, dp, isTraining=False )
     loss += step_loss
 
     # denormalize

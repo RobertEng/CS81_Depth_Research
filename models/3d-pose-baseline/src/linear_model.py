@@ -101,11 +101,13 @@ class LinearModel(object):
       # in=2d poses, out=3d poses
       enc_in  = tf.placeholder(dtype, shape=[None, self.input_size], name="enc_in")
       dec_out = tf.placeholder(dtype, shape=[None, self.output_size], name="dec_out")
-      loss_pairs = tf.placeholder(tf.int32, shape=[None, self.num_loss_pairs], name="loss_pairs")
 
       self.encoder_inputs  = enc_in
       self.decoder_outputs = dec_out
-      self.loss_pairs      = loss_pairs
+      
+      if self.num_loss_pairs:
+        loss_pairs = tf.placeholder(tf.int32, shape=[None, self.num_loss_pairs, 2], name="loss_pairs")
+        self.loss_pairs    = loss_pairs
 
     # === Create the linear + relu combos ===
     with vs.variable_scope( "linear_model" ):
@@ -134,14 +136,19 @@ class LinearModel(object):
 
     # Store the outputs here
     self.outputs = y
-    # self.loss = tf.reduce_mean(tf.square(y - dec_out))
-    # num_pts = int(self.HUMAN_3D_SIZE / 3)
-    # self.pairs = tf.convert_to_tensor([(i, j) for i in range(num_pts) for j in range(num_pts) if i != j])
-    #print (tf.size(self.pairs))
-    # self.pairs = tf.Print(self.pairs,[self.pairs],message="something")
-    # self.pairs.eval()
-    # self.pairs_range = range(tf.size(self.pairs).eval() / 2)
-    self.loss = preloss_tf(y, dec_out, loss_pairs)
+    if self.num_loss_pairs:
+      # num_pts = int(self.HUMAN_3D_SIZE / 3)
+      # self.pairs = tf.convert_to_tensor([(i, j) for i in range(num_pts) for j in range(num_pts) if i != j])
+      #print (tf.size(self.pairs))
+      # self.pairs = tf.Print(self.pairs,[self.pairs],message="something")
+      # self.pairs.eval()
+      # self.pairs_range = range(tf.size(self.pairs).eval() / 2)
+      # y = tf.Print(y,[y.shape],message="y shape ",summarize=128)
+      # dec_out = tf.Print(dec_out,[dec_out.shape],message="dec_out shape ",summarize=128)
+      # loss_pairs = tf.Print(loss_pairs,[loss_pairs.shape],message="loss_pairs shape ",summarize=128)
+      self.loss = preloss_tf(y, dec_out, loss_pairs)
+    else:
+      self.loss = tf.reduce_mean(tf.square(y - dec_out))
     self.loss_summary = tf.summary.scalar('loss/loss', self.loss)
 
     # To keep track of the loss in mm
@@ -304,48 +311,28 @@ class LinearModel(object):
       decoder_outputs = decoder_outputs[idx, :]
 
     # Generate the loss pairs
-    num_pts = int(self.HUMAN_3D_SIZE / 3)
-    pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i < j])
-    pair_idxs = [np.random.choice(len(pairs), self.num_loss_pairs) for _ in range(n)]
-    loss_pairs = np.take(pairs, pair_idxs, axis=0)
+    loss_pairs = None
+    if self.num_loss_pairs:
+      num_pts = int(self.HUMAN_3D_SIZE / 3)
+      pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i < j])
+      pair_idxs = [np.random.choice(len(pairs), self.num_loss_pairs) for _ in range(n)]
+      loss_pairs = np.take(pairs, pair_idxs, axis=0)
+      # print (len(loss_pairs))
 
+    # print (loss_pairs)
+    # print (loss_pairs.shape)
     # Make the number of examples a multiple of the batch size
     n_extra  = n % self.batch_size
     if n_extra > 0:  # Otherwise examples are already a multiple of batch size
       encoder_inputs  = encoder_inputs[:-n_extra, :]
       decoder_outputs = decoder_outputs[:-n_extra, :]
-      loss_pairs      = loss_pairs[:-n_extra, :]
+      if self.num_loss_pairs:
+        loss_pairs    = loss_pairs[:-n_extra, :]
 
     n_batches = n // self.batch_size
     encoder_inputs  = np.split( encoder_inputs, n_batches )
     decoder_outputs = np.split( decoder_outputs, n_batches )
-    loss_pairs      = np.split( loss_pairs, n_batches )
+    if self.num_loss_pairs:
+      loss_pairs    = np.split( loss_pairs, n_batches )
 
     return encoder_inputs, decoder_outputs, loss_pairs
-
-  def loss_tf(pred, r):
-
-    squared_diff = tf.square(pred[:,1] - pred[:,0])
-    # squared_diff = tf.Print(squared_diff,[squared_diff],message="squared_diff ",summarize=128)
-
-    loss_partial = tf.reshape(tf.log(1+tf.exp(r * (pred[:,1] - pred[:,0]))),[-1,1])
-    # loss_partial = tf.Print(loss_partial,[loss_partial],message="loss_partial ", summarize=128)
-
-    good = tf.cast(tf.where(tf.equal(r, 0.)),tf.int32)
-    # good = tf.Print(good,[good],message="good ", summarize=128)
-    gathered_good = tf.reshape(tf.gather(squared_diff,good),[-1])
-    # gathered_good = tf.Print(gathered_good,[gathered_good],message="gathered_good ", summarize=128)
-    updates_gathered_good = tf.scatter_nd(good, gathered_good,  tf.shape(squared_diff))
-    # updates_gathered_good = tf.Print(updates_gathered_good,[updates_gathered_good],message="updates_gathered_good ", summarize=128)
-
-    not_good = tf.cast(tf.where(tf.not_equal(r, 0.)),tf.int32)
-    # not_good = tf.Print(not_good,[not_good],message="not_good ", summarize=128)
-    gathered_not_good = tf.reshape(tf.gather(loss_partial,not_good),[-1])
-    # gathered_not_good = tf.Print(gathered_not_good,[gathered_not_good],message="gathered_not_good ", summarize=128)
-    updates_gathered_not_good = tf.scatter_nd(not_good, gathered_not_good,  tf.shape(squared_diff))
-    # updates_gathered_not_good = tf.Print(updates_gathered_not_good,[updates_gathered_not_good],message="updates_gathered_not_good ", summarize=128)
-
-    loss = tf.reduce_sum(updates_gathered_not_good + updates_gathered_good)
-    # loss = tf.Print(loss,[loss],message="loss ",summarize=128)
-
-    return loss

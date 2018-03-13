@@ -45,7 +45,7 @@ tf.app.flags.DEFINE_boolean("residual", False, "Whether to add a residual connec
 # Evaluation
 tf.app.flags.DEFINE_boolean("procrustes", False, "Apply procrustes analysis at test time")
 tf.app.flags.DEFINE_boolean("evaluateActionWise",False, "The dataset to use either h36m or heva")
-tf.app.flags.DEFINE_integer("num_loss_pairs", 64, "Number of pairs to evaluate loss with")
+tf.app.flags.DEFINE_integer("loss_pairs", None, "Number of pairs to evaluate loss.")
 
 # Directories
 tf.app.flags.DEFINE_string("cameras_path","data/h36m/cameras.h5","Directory to load camera parameters")
@@ -75,7 +75,8 @@ train_dir = os.path.join( FLAGS.train_dir,
   'maxnorm' if FLAGS.max_norm else 'no_maxnorm',
   'batch_normalization' if FLAGS.batch_norm else 'no_batch_normalization',
   'use_stacked_hourglass' if FLAGS.use_sh else 'not_stacked_hourglass',
-  'predict_14' if FLAGS.predict_14 else 'predict_17')
+  'predict_14' if FLAGS.predict_14 else 'predict_17',
+  'loss_pairs' if FLAGS.loss_pairs else 'no_loss_pairs')
 
 print( train_dir )
 summaries_dir = os.path.join( train_dir, "log" ) # Directory for TB summaries
@@ -106,7 +107,7 @@ def create_model( session, actions, batch_size ):
       FLAGS.max_norm,
       batch_size,
       FLAGS.learning_rate,
-      FLAGS.num_loss_pairs,
+      FLAGS.loss_pairs,
       summaries_dir,
       FLAGS.predict_14,
       dtype=tf.float16 if FLAGS.use_fp16 else tf.float32)
@@ -199,7 +200,11 @@ def train():
           # Print progress every log_every_n_batches batches
           print("Working on epoch {0}, batch {1} / {2}... ".format( current_epoch, i+1, nbatches), end="" )
 
-        enc_in, dec_out, loss_ps = encoder_inputs[i], decoder_outputs[i], loss_pairs[i]
+        loss_ps = None
+        enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
+        if loss_pairs:
+          loss_ps = loss_pairs[i]
+
         step_loss, loss_summary, lr_summary, _ =  model.step( sess, enc_in, dec_out, loss_ps, FLAGS.dropout, isTraining=True )
 
         if (i+1) % log_every_n_batches == 0:
@@ -347,7 +352,10 @@ def evaluate_batches( sess, model,
     if current_epoch > 0 and (i+1) % log_every_n_batches == 0:
       print("Working on test epoch {0}, batch {1} / {2}".format( current_epoch, i+1, nbatches) )
 
-    enc_in, dec_out, loss_ps = encoder_inputs[i], decoder_outputs[i], loss_pairs[i]
+    loss_ps = None
+    if loss_pairs:
+      loss_ps = loss_pairs[i]
+    enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
     dp = 1.0 # dropout keep probability is always 1 at test time
     step_loss, loss_summary, poses3d = model.step( sess, enc_in, dec_out, loss_ps, dp, isTraining=False )
     loss += step_loss

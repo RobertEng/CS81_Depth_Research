@@ -205,7 +205,7 @@ def train():
         if loss_pairs:
           loss_ps = loss_pairs[i]
 
-        step_loss, loss_summary, lr_summary, _ =  model.step( sess, enc_in, dec_out, loss_ps, FLAGS.dropout, isTraining=True )
+        step_loss, loss_summary, lr_summary, _ =  model.step( sess, enc_in, dec_out, FLAGS.dropout, loss_pairs=loss_ps, isTraining=True )
 
         if (i+1) % log_every_n_batches == 0:
           # Log and print progress every log_every_n_batches batches
@@ -357,7 +357,7 @@ def evaluate_batches( sess, model,
       loss_ps = loss_pairs[i]
     enc_in, dec_out = encoder_inputs[i], decoder_outputs[i]
     dp = 1.0 # dropout keep probability is always 1 at test time
-    step_loss, loss_summary, poses3d = model.step( sess, enc_in, dec_out, loss_ps, dp, isTraining=False )
+    step_loss, loss_summary, poses3d = model.step( sess, enc_in, dec_out, dp, loss_pairs=loss_ps, isTraining=False )
     loss += step_loss
 
     # denormalize
@@ -450,6 +450,15 @@ def sample():
       n3d, _ = dec_out.shape
       assert n2d == n3d
 
+      # Generate the loss pairs
+      loss_pairs = None
+      if model.num_loss_pairs:
+        num_pts = int(model.HUMAN_3D_SIZE / 3)
+        pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i < j])
+        pair_idxs = [np.random.choice(len(pairs), model.num_loss_pairs, replace=False) for _ in range(n3d)]
+        loss_pairs = np.take(pairs, pair_idxs, axis=0)
+        loss_pairs = np.array_split( loss_pairs, n2d // batch_size )
+
       # Split into about-same-size batches
       enc_in   = np.array_split( enc_in,  n2d // batch_size )
       dec_out  = np.array_split( dec_out, n3d // batch_size )
@@ -459,7 +468,23 @@ def sample():
 
         # Dropout probability 0 (keep probability 1) for sampling
         dp = 1.0
-        _, _, poses3d = model.step(sess, enc_in[bidx], dec_out[bidx], dp, isTraining=False)
+        if model.num_loss_pairs:
+          # model.loss = tf.reduce_mean(tf.square(model.outputs - model.decoder_outputs))
+          # model.loss_pairs = None
+          graph = tf.get_default_graph()
+          # print (graph.get_operations())
+          # print (tf.get_default_graph().get_tensor_by_name("loss_pairs:0"))
+          # print (enc_in[0][0])
+          # print (len(enc_in))
+          # print (len(enc_in[0]))
+          # print (len(enc_in[0][0]))
+          # print (np.shape(enc_in))
+          # print (np.shape(dec_out))
+          # print (np.shape(loss_pairs))
+          _, _, poses3d = model.step(sess, enc_in[bidx], dec_out[bidx], dp, loss_pairs=loss_pairs[bidx], isTraining=False)
+          # sys.exit()
+        else:
+          _, _, poses3d = model.step(sess, enc_in[bidx], dec_out[bidx], dp, isTraining=False)
 
         # denormalize
         enc_in[bidx]  = data_utils.unNormalizeData(  enc_in[bidx], data_mean_2d, data_std_2d, dim_to_ignore_2d )

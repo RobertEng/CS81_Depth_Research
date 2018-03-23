@@ -15,6 +15,7 @@ import tensorflow as tf
 import data_utils
 import cameras as cam
 
+sys.path.insert(0, '/home/reng/Documents/CS81_Depth_Research/scripts')
 sys.path.insert(0, '/Users/Robert/Documents/Caltech/CS81_Depth_Research/scripts')
 from loss import preloss_tf
 

@@ -145,9 +145,9 @@ def main():
     # tf_loss = loss_tf(tf_truth, tf_r)
     tf_loss = sess.run([loss])
 
-    print np_loss, tf_loss
+    print (np_loss, tf_loss)
 
-    print "Done"
+    print ("Done")
 
 if __name__ == '__main__':
     main()

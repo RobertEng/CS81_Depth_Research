@@ -148,6 +148,8 @@ class LinearModel(object):
       # dec_out = tf.Print(dec_out,[dec_out.shape],message="dec_out shape ",summarize=128)
       # loss_pairs = tf.Print(loss_pairs,[loss_pairs.shape],message="loss_pairs shape ",summarize=128)
       self.loss = preloss_tf(y, dec_out, loss_pairs)
+      self.dist_loss = tf.reduce_mean(tf.square(y - dec_out))
+      self.dist_loss_summary = tf.summary.scalar('loss/dist_loss', self.dist_loss)
     else:
       self.loss = tf.reduce_mean(tf.square(y - dec_out))
     self.loss_summary = tf.summary.scalar('loss/loss', self.loss)
@@ -223,7 +225,7 @@ class LinearModel(object):
 
     return y
 
-  def step(self, session, encoder_inputs, decoder_outputs, loss_pairs, dropout_keep_prob, isTraining=True):
+  def step(self, session, encoder_inputs, decoder_outputs, dropout_keep_prob, loss_pairs=None, isTraining=True):
     """Run a step of the model feeding the given inputs.
 
     Args
@@ -261,10 +263,18 @@ class LinearModel(object):
       return outputs[1], outputs[2], outputs[3], outputs[4]
 
     else:
-      output_feed = [self.loss, # Loss for this batch.
-                     self.loss_summary,
-                     self.outputs]
-
+      if loss_pairs is not None:
+        output_feed = [self.loss, # Loss for this batch.
+                       self.loss_summary,
+                       self.outputs,
+                       self.dist_loss,
+                       self.dist_loss_summary]
+        outputs = session.run(output_feed, input_feed)
+        return outputs[3], outputs[4], outputs[2]
+      else:
+        output_feed = [self.loss, # Loss for this batch.
+                       self.loss_summary,
+                       self.outputs]
       outputs = session.run(output_feed, input_feed)
       return outputs[0], outputs[1], outputs[2]  # No gradient norm
 
@@ -316,12 +326,9 @@ class LinearModel(object):
     if self.num_loss_pairs:
       num_pts = int(self.HUMAN_3D_SIZE / 3)
       pairs = np.asarray([(i, j) for i in range(num_pts) for j in range(num_pts) if i < j])
-      pair_idxs = [np.random.choice(len(pairs), self.num_loss_pairs) for _ in range(n)]
+      pair_idxs = [np.random.choice(len(pairs), self.num_loss_pairs, replace=False) for _ in range(n)]
       loss_pairs = np.take(pairs, pair_idxs, axis=0)
-      # print (len(loss_pairs))
 
-    # print (loss_pairs)
-    # print (loss_pairs.shape)
     # Make the number of examples a multiple of the batch size
     n_extra  = n % self.batch_size
     if n_extra > 0:  # Otherwise examples are already a multiple of batch size

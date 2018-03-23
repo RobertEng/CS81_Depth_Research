@@ -268,7 +268,6 @@ class LinearModel(object):
                        self.outputs,
                        self.dist_loss,
                        self.dist_loss_summary]
-        print ("step func: istraining=false, loss_pairs=not None")
         outputs = session.run(output_feed, input_feed)
         return outputs[3], outputs[4], outputs[2]
       else:

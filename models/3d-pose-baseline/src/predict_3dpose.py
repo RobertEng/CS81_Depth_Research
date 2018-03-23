@@ -561,6 +561,7 @@ def sample():
     exidx = exidx + 1
     subplot_idx = subplot_idx + 3
 
+  plt.savefig('batch_poses')
   plt.show()
 
 def main(_):

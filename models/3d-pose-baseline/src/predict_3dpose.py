@@ -12,6 +12,7 @@ import sys
 import time
 import h5py
 import copy
+import code
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -54,6 +55,7 @@ tf.app.flags.DEFINE_string("train_dir", "experiments", "Training directory.")
 
 # Train or load
 tf.app.flags.DEFINE_boolean("sample", False, "Set to True for sampling.")
+tf.app.flags.DEFINE_boolean("evaluate", False, "Set to True for simple model evaluation.")
 tf.app.flags.DEFINE_boolean("use_cpu", False, "Whether to use the CPU")
 tf.app.flags.DEFINE_integer("load", 0, "Try to load a previous checkpoint.")
 
@@ -137,6 +139,8 @@ def create_model( session, actions, batch_size ):
     return model
   else:
     print("Could not find checkpoint. Aborting.")
+    code.interact(local=locals())
+
     raise( ValueError, "Checkpoint {0} does not seem to exist".format( ckpt.model_checkpoint_path ) )
 
   return model
@@ -410,6 +414,69 @@ def evaluate_batches( sess, model,
 
 def sample():
   """Get samples from a model and visualize them"""
+  enc_in, dec_out, poses3d = predict(True)
+
+  # poses3dnew = []
+  # for p, e in zip(poses3d, enc_in):
+  #   poses3dnew.append(np.insert(e, range(1, len(e)+1, 2), p[1::3]))
+  # poses3d = poses3dnew
+    
+  # poses3dnew = dec_out.copy()
+  # poses3dnew[:,1::3] = poses3d[:,1::3]
+  # poses3d = poses3dnew
+  
+  
+  # Grab a random batch to visualize
+  enc_in, dec_out, poses3d = map( np.vstack, [enc_in, dec_out, poses3d] )
+  idx = np.random.permutation( enc_in.shape[0] )
+  enc_in, dec_out, poses3d = enc_in[idx, :], dec_out[idx, :], poses3d[idx, :]
+
+  # Visualize random samples
+  import matplotlib.gridspec as gridspec
+
+  # 1080p	= 1,920 x 1,080
+  fig = plt.figure( figsize=(19.2, 10.8) )
+
+  gs1 = gridspec.GridSpec(5, 9) # 5 rows, 9 columns
+  gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes.
+  plt.axis('off')
+
+  subplot_idx, exidx = 1, 1
+  nsamples = 15
+  for i in np.arange( nsamples ):
+
+    # Plot 2d pose
+    ax1 = plt.subplot(gs1[subplot_idx-1])
+    p2d = enc_in[exidx,:]
+    viz.show2Dpose( p2d, ax1 )
+    ax1.invert_yaxis()
+
+    # Plot 3d gt
+    ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
+    p3d = dec_out[exidx,:]
+    viz.show3Dpose( p3d, ax2 )
+
+    # Plot 3d predictions
+    ax3 = plt.subplot(gs1[subplot_idx+1], projection='3d')
+    p3d = poses3d[exidx,:]
+    viz.show3Dpose( p3d, ax3, lcolor="#9b59b6", rcolor="#2ecc71" )
+
+    exidx = exidx + 1
+    subplot_idx = subplot_idx + 3
+
+  plt.savefig('batch_poses')
+  plt.show()
+
+  code.interact(local=locals())
+
+
+def predict(convert_to_world):
+  """
+  Run the model and predict pose data
+
+  convert_to_world is a flag indicating whether to convert the data back to 
+  world coordinates from the camera frame.
+  """
 
   actions = data_utils.define_actions( FLAGS.action )
 
@@ -464,109 +531,136 @@ def sample():
       dec_out  = np.array_split( dec_out, n3d // batch_size )
       all_poses_3d = []
 
+      # enc_in_modified = []
+
       for bidx in range( len(enc_in) ):
 
         # Dropout probability 0 (keep probability 1) for sampling
         dp = 1.0
         if model.num_loss_pairs:
-          # model.loss = tf.reduce_mean(tf.square(model.outputs - model.decoder_outputs))
-          # model.loss_pairs = None
-          graph = tf.get_default_graph()
-          # print (graph.get_operations())
-          # print (tf.get_default_graph().get_tensor_by_name("loss_pairs:0"))
-          # print (enc_in[0][0])
-          # print (len(enc_in))
-          # print (len(enc_in[0]))
-          # print (len(enc_in[0][0]))
-          # print (np.shape(enc_in))
-          # print (np.shape(dec_out))
-          # print (np.shape(loss_pairs))
           _, _, poses3d = model.step(sess, enc_in[bidx], dec_out[bidx], dp, loss_pairs=loss_pairs[bidx], isTraining=False)
-          # sys.exit()
         else:
           _, _, poses3d = model.step(sess, enc_in[bidx], dec_out[bidx], dp, isTraining=False)
 
+        # poses3dnew = []
+        # for e in enc_in[bidx]:
+        #   poses3dnew.append(np.insert(e, range(1, len(e)+1, 2), poses3d[1::3]))
+        # poses3d = poses3dnew
+        # print (bidx)
+        # print (len(enc_in[bidx]))
+        # print (enc_in[bidx])
+        # print (data_mean_2d)
+        # print (data_mean_3d)
+        # data_mean_2d_modified = np.delete(data_mean_3d, np.arange(2, data_mean_3d.size, 3))
+        # data_std_2d_modified = np.delete(data_std_3d, np.arange(2, data_std_3d.size, 3))
+
         # denormalize
+        # enc_in_modified.append(data_utils.unNormalizeData(  enc_in[bidx], data_mean_2d_modified, data_std_2d_modified, dim_to_ignore_2d ))
         enc_in[bidx]  = data_utils.unNormalizeData(  enc_in[bidx], data_mean_2d, data_std_2d, dim_to_ignore_2d )
         dec_out[bidx] = data_utils.unNormalizeData( dec_out[bidx], data_mean_3d, data_std_3d, dim_to_ignore_3d )
         poses3d = data_utils.unNormalizeData( poses3d, data_mean_3d, data_std_3d, dim_to_ignore_3d )
         all_poses_3d.append( poses3d )
 
+        # print (len(enc_in[bidx]))
+        # print (len(poses3d))
+      # print (len(enc_in[0]))
+      # print (len(poses3d[0]))
+        
       # Put all the poses together
+      # enc_in_modified = np.vstack(enc_in_modified)
       enc_in, dec_out, poses3d = map( np.vstack, [enc_in, dec_out, all_poses_3d] )
 
-      # Convert back to world coordinates
-      if FLAGS.camera_frame:
-        N_CAMERAS = 4
-        N_JOINTS_H36M = 32
+      # print (len(enc_in[0]))
+      # print (len(poses3d[0]))
+      # print (enc_in.shape)
+      # print (poses3d.shape)
 
-        # Add global position back
-        dec_out = dec_out + np.tile( test_root_positions[ key3d ], [1,N_JOINTS_H36M] )
+      # poses3dnew = []
+      # for p, e in zip(poses3d, enc_in_modified):
+      #   poses3dnew.append(np.insert(e, range(1, len(e)+1, 2), p[1::3]))
+      # poses3d = np.array(poses3dnew)
 
-        # Load the appropriate camera
-        subj, _, sname = key3d
+      if convert_to_world:
+        # Convert back to world coordinates
+        if FLAGS.camera_frame:
+          N_CAMERAS = 4
+          N_JOINTS_H36M = 32
 
-        cname = sname.split('.')[1] # <-- camera name
-        scams = {(subj,c+1): rcams[(subj,c+1)] for c in range(N_CAMERAS)} # cams of this subject
-        scam_idx = [scams[(subj,c+1)][-1] for c in range(N_CAMERAS)].index( cname ) # index of camera used
-        the_cam  = scams[(subj, scam_idx+1)] # <-- the camera used
-        R, T, f, c, k, p, name = the_cam
-        assert name == cname
+          # Add global position back
+          dec_out = dec_out + np.tile( test_root_positions[ key3d ], [1,N_JOINTS_H36M] )
 
-        def cam2world_centered(data_3d_camframe):
-          data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
-          data_3d_worldframe = data_3d_worldframe.reshape((-1, N_JOINTS_H36M*3))
-          # subtract root translation
-          return data_3d_worldframe - np.tile( data_3d_worldframe[:,:3], (1,N_JOINTS_H36M) )
+          # Load the appropriate camera
+          subj, _, sname = key3d
 
-        # Apply inverse rotation and translation
-        dec_out = cam2world_centered(dec_out)
-        poses3d = cam2world_centered(poses3d)
+          cname = sname.split('.')[1] # <-- camera name
+          scams = {(subj,c+1): rcams[(subj,c+1)] for c in range(N_CAMERAS)} # cams of this subject
+          scam_idx = [scams[(subj,c+1)][-1] for c in range(N_CAMERAS)].index( cname ) # index of camera used
+          the_cam  = scams[(subj, scam_idx+1)] # <-- the camera used
+          R, T, f, c, k, p, name = the_cam
+          assert name == cname
 
-  # Grab a random batch to visualize
-  enc_in, dec_out, poses3d = map( np.vstack, [enc_in, dec_out, poses3d] )
-  idx = np.random.permutation( enc_in.shape[0] )
-  enc_in, dec_out, poses3d = enc_in[idx, :], dec_out[idx, :], poses3d[idx, :]
+          def cam2world_centered(data_3d_camframe):
+            data_3d_worldframe = cameras.camera_to_world_frame(data_3d_camframe.reshape((-1, 3)), R, T)
+            data_3d_worldframe = data_3d_worldframe.reshape((-1, N_JOINTS_H36M*3))
+            # subtract root translation
+            return data_3d_worldframe - np.tile( data_3d_worldframe[:,:3], (1,N_JOINTS_H36M) )
 
-  # Visualize random samples
-  import matplotlib.gridspec as gridspec
+          # Apply inverse rotation and translation
+          dec_out = cam2world_centered(dec_out)
+          poses3d = cam2world_centered(poses3d)
 
-  # 1080p	= 1,920 x 1,080
-  fig = plt.figure( figsize=(19.2, 10.8) )
+  poses3dnew = dec_out.copy()
+  poses3dnew[:,1::3] = poses3d[:,1::3]
+  poses3d = poses3dnew
+  return enc_in, dec_out, poses3d
 
-  gs1 = gridspec.GridSpec(5, 9) # 5 rows, 9 columns
-  gs1.update(wspace=-0.00, hspace=0.05) # set the spacing between axes.
-  plt.axis('off')
+def evaluate():
+  enc_in, dec_out, poses3d = predict(False)
 
-  subplot_idx, exidx = 1, 1
-  nsamples = 15
-  for i in np.arange( nsamples ):
+  # Measure relative ordering (somehow) between ground truth (dec_out) and prediction (poses3d)
+  dec_out_z = dec_out[:,1::3]
+  poses3d_z = dec_out[:,1::3]
 
-    # Plot 2d pose
-    ax1 = plt.subplot(gs1[subplot_idx-1])
-    p2d = enc_in[exidx,:]
-    viz.show2Dpose( p2d, ax1 )
-    ax1.invert_yaxis()
+  # np.average(np.amax(dec_out_z, axis=1))
+  # np.average(np.amin(dec_out_z, axis=1))
+  dec_out_z_min = np.median(np.amin(dec_out_z, axis=1))
+  dec_out_z_max = np.median(np.amax(dec_out_z, axis=1))
 
-    # Plot 3d gt
-    ax2 = plt.subplot(gs1[subplot_idx], projection='3d')
-    p3d = dec_out[exidx,:]
-    viz.show3Dpose( p3d, ax2 )
+  poses3d_z_min = np.median(np.amin(poses3d_z, axis=1))
+  poses3d_z_max = np.median(np.amax(poses3d_z, axis=1))
 
-    # Plot 3d predictions
-    ax3 = plt.subplot(gs1[subplot_idx+1], projection='3d')
-    p3d = poses3d[exidx,:]
-    viz.show3Dpose( p3d, ax3, lcolor="#9b59b6", rcolor="#2ecc71" )
+  scaling_factor = (dec_out_z_max - dec_out_z_min) / (poses3d_z_max - poses3d_z_min)
 
-    exidx = exidx + 1
-    subplot_idx = subplot_idx + 3
+  print ("poses3d_z min: {}, poses3d_z max: {}", poses3d_z_min, poses3d_z_max)
+  print ("dec_out_z min: {}, dec_out_z max: {}", dec_out_z_min, dec_out_z_max)
+  print ("Scaling factor: {}", scaling_factor)
 
-  plt.savefig('batch_poses')
-  plt.show()
+  # Order the z values, but replace them with their original index
+  dec_out_z = np.argsort(dec_out_z)
+  poses3d_z = np.argsort(poses3d_z)
+
+  # The index of the values in the sorted array
+  dec_out_z = np.argsort(dec_out_z)
+  poses3d_z = np.argsort(poses3d_z)  
+
+  ranking_err = np.absolute(dec_out_z - poses3d_z)
+  avg_ranking_err = ranking_err.sum() / ranking_err.shape[0]
+
+  ranking_sq_err = (dec_out_z - poses3d_z)**2
+  avg_ranking_sq_err = ranking_sq_err.sum() / ranking_sq_err.shape[0]
+
+  print ("avg_ranking_err: {}", avg_ranking_err)
+  print ("avg_ranking_sq_err: {}", avg_ranking_sq_err)
+  
 
 def main(_):
+  if FLAGS.sample and FLAGS.evaluate:
+    printf("Cannot sample and predict at same time")
+    sys.exit()
   if FLAGS.sample:
     sample()
+  elif FLAGS.evaluate:
+    evaluate()
   else:
     train()
 

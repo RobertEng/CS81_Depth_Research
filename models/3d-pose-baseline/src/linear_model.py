@@ -76,9 +76,15 @@ class LinearModel(object):
     # directly comparable to those in https://arxiv.org/pdf/1611.09010.pdf
     self.HUMAN_3D_SIZE = 14 * 3 if predict_14 else 16 * 3
 
-    self.input_size  = self.HUMAN_2D_SIZE
-    self.output_size = self.HUMAN_3D_SIZE
     self.num_loss_pairs = num_loss_pairs
+    self.input_size  = self.HUMAN_2D_SIZE
+    # If training on relative depth, we only output z values rather than x, y, z
+    if self.num_loss_pairs:
+      # TODO: Implement this
+      # self.output_size = self.HUMAN_3D_SIZE / 3
+      self.output_size = self.HUMAN_3D_SIZE
+    else:
+      self.output_size = self.HUMAN_3D_SIZE
 
     self.isTraining = tf.placeholder(tf.bool,name="isTrainingflag")
     self.dropout_keep_prob = tf.placeholder(tf.float32, name="dropout_keep_prob")
@@ -105,6 +111,7 @@ class LinearModel(object):
       self.encoder_inputs  = enc_in
       self.decoder_outputs = dec_out
       
+      # if training on relative depth, input also includes the batches of pairs of kpts
       if self.num_loss_pairs:
         loss_pairs = tf.placeholder(tf.int32, shape=[None, self.num_loss_pairs, 2], name="loss_pairs")
         self.loss_pairs    = loss_pairs
@@ -128,8 +135,8 @@ class LinearModel(object):
         y3 = self.two_linear( y3, linear_size, residual, self.dropout_keep_prob, max_norm, batch_norm, dtype, idx )
 
       # === Last linear layer has HUMAN_3D_SIZE in output ===
-      w4 = tf.get_variable( name="w4", initializer=kaiming, shape=[linear_size, self.HUMAN_3D_SIZE], dtype=dtype )
-      b4 = tf.get_variable( name="b4", initializer=kaiming, shape=[self.HUMAN_3D_SIZE], dtype=dtype )
+      w4 = tf.get_variable( name="w4", initializer=kaiming, shape=[linear_size, self.output_size], dtype=dtype )
+      b4 = tf.get_variable( name="b4", initializer=kaiming, shape=[self.output_size], dtype=dtype )
       w4 = tf.clip_by_norm(w4,1) if max_norm else w4
       y = tf.matmul(y3, w4) + b4
       # === End linear model ===
@@ -243,12 +250,17 @@ class LinearModel(object):
       if isTraining is False, a 3-tuple
         (loss, loss_summary, outputs) same as above
     """
-
-    input_feed = {self.encoder_inputs: encoder_inputs,
-                  self.decoder_outputs: decoder_outputs,
-                  self.loss_pairs: loss_pairs,
-                  self.isTraining: isTraining,
-                  self.dropout_keep_prob: dropout_keep_prob}
+    if loss_pairs is not None:
+      input_feed = {self.encoder_inputs: encoder_inputs,
+                    self.decoder_outputs: decoder_outputs,
+                    self.loss_pairs: loss_pairs,
+                    self.isTraining: isTraining,
+                    self.dropout_keep_prob: dropout_keep_prob}
+    else:
+      input_feed = {self.encoder_inputs: encoder_inputs,
+                    self.decoder_outputs: decoder_outputs,
+                    self.isTraining: isTraining,
+                    self.dropout_keep_prob: dropout_keep_prob}
 
     # Output feed: depends on whether we do a backward step or not.
     if isTraining:

@@ -15,7 +15,7 @@ COCO_ANNOTATION_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/'  \
 HUMAN_IMAGES_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/' \
                    'datasets/human36m_images'
 
-HUMAN_RAW_RESULT_FILE = "cocoa_test_completed_601_DepthHITS_2017-06-13_13-25-31.pkl"
+HUMAN_RAW_RESULT_FILE = "cocoa_test_completed_1000_DepthHITS_2018-04-24_09-14-49.pkl"
 COCO_RAW_RESULT_FILE = "cocoa_test_completed_2400_DepthHITS_2017-06-13_13-22-13.pkl"
 HUMAN_ANNOTATION_FILE = 'human36m_train.json'
 COCO_ANNOTATION_FILE = 'person_keypoints_train2014.json'

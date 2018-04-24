@@ -10,6 +10,7 @@ from viz_utils import (visualize_HIT, plot_image, plot_baseline_viz,
     plot_3d_stickcoords, project_to_axis, plot_2d_stickcoords)
 from constants import (HUMAN_ANNOTATION_PATH, HUMAN_IMAGES_DIR,
     POSE_BASELINE_MODEL_PATH, BASELINE_DATA_PATH)
+from lean_correction import correct_lean
 
 sys.path.insert(0, '/Users/Robert/Documents/Caltech/CS81_Depth_Research/models/3d-pose-baseline/src')
 import cameras
@@ -23,6 +24,7 @@ i = 0
 # i_baseline = i_human * 5 ## DOESN"T WORK. EXAMINE THIS LATER.
 
 SUBJ_IDS = [1]
+SUBJ_IDS = [279782]
 camera_frame = False
 experimental = False
 actions = ['Directions']
@@ -46,9 +48,30 @@ actions = ['Directions']
 # pts_projected = project_to_axis(action_data[i], plane)
 # plot_2d_stickcoords(pts_projected, plane=plane, dataset='baseline')
 
-
 ################################################################################
 ## ORIGINAL VIZ
+idx = None
+img_id = 279782
+with open( HUMAN_ANNOTATION_PATH ) as f:
+  _human_dataset = json.load(f)
+  correct_lean(_human_dataset)
+  for _i, d in enumerate(_human_dataset['images']):
+    if d['id'] == img_id:
+      idx = _i
+      break
+print idx
+i = idx
+
+data = _human_dataset['annotations']
+plot_image(_human_dataset['annotations'][i]['kpts_2d'],
+           _human_dataset['images'][i]['filename'])
+plot_3d_stickcoords(_human_dataset['annotations'][i]['kpts_3d'])
+plt.show()
+
+################################################################################
+## ORIGINAL VIZ WITH TURKERS
+
+# idx = None
 
 # # TURKER DATA
 # data = postprocess_original_utils.load_data()
@@ -67,7 +90,8 @@ actions = ['Directions']
 # # img_id = 790655  # annotation 0 for s1
 # # img_id = 37859 # suspicious guy who annotated everything wrong but actually the pic is hard
 # # img_id = 202669
-# # print(data[536]['annotations_truth'])
+# img_id = 279782
+# # print(data[536])
 # for _i, d in enumerate(data):
 #     if d['annotations_truth']['i_id'] == img_id:
 #         idx = _i
@@ -99,72 +123,55 @@ actions = ['Directions']
 ################################################################################
 # CALTECH VIZ
 
-from constants import CALTECH_OUTPUT_PATH
-data = json.load(open(CALTECH_OUTPUT_PATH, 'r'))
-data = [d for d in data if d['_worker_id'] == 'nonAMT_687008']
-'''
-{u'Amanda Lin: nonAMT_808135',
- u'Caltech: ',
- u'Jennifer - Hi! I wou: nonAMT_607266',
- u'Matteo: nonAMT_368102',
- u'Milan: nonAMT_6599',
- u'Oisin: nonAMT_687008',
- u'Ron: nonAMT_764039',
- u'This is Jalani. I wo: nonAMT_158235',
- u'caltech: ',
- u'lucy: nonAMT_700986'}
+# from constants import CALTECH_OUTPUT_PATH
+# data = json.load(open(CALTECH_OUTPUT_PATH, 'r'))
+# data = [d for d in data if d['_worker_id'] == 'nonAMT_687008']
+# '''
+# {u'Amanda Lin: nonAMT_808135',
+#  u'Caltech: ',
+#  u'Jennifer - Hi! I wou: nonAMT_607266',
+#  u'Matteo: nonAMT_368102',
+#  u'Milan: nonAMT_6599',
+#  u'Oisin: nonAMT_687008',
+#  u'Ron: nonAMT_764039',
+#  u'This is Jalani. I wo: nonAMT_158235',
+#  u'caltech: ',
+#  u'lucy: nonAMT_700986'}
 
-img_ids = [56833, 965922, 849671, 649263, 12750, 896082, 571176, 965922]
- '''
-img_id = 56833 # easy
-# img_id = 965922 # easy
-# img_id = 849671 # easy-medium
-# img_id = 649263 # medium
-# img_id = 12750 # hard
-# img_id = 896082 # hard
-# img_id = 571176 # medium
+# img_ids = [56833, 965922, 849671, 649263, 12750, 896082, 571176, 965922]
+#  '''
+# img_id = 56833 # easy
+# # img_id = 965922 # easy
+# # img_id = 849671 # easy-medium
+# # img_id = 649263 # medium
+# # img_id = 12750 # hard
+# # img_id = 896082 # hard
+# # img_id = 571176 # medium
 
-for _i, d in enumerate(data):
-    if d['annotations_truth']['i_id'] == img_id:
-        idx = _i
-        break
-print idx
-i = idx
+# for _i, d in enumerate(data):
+#     if d['annotations_truth']['i_id'] == img_id:
+#         idx = _i
+#         break
+# print idx
+# i = idx
 
-plot_image(data[i]['annotations_truth']['kpts_2d'],
-           data[i]['images_truth']['filename'], label="relative_depth",
-           kpts_relative_depth=data[i]['annotations_truth']['kpts_relative_depth'])
-plt.title("Ground Truth Ordering")
-plot_image(data[i]['annotations_truth']['kpts_2d'],
-           data[i]['images_truth']['filename'], label="relative_depth",
-           kpts_relative_depth=data[i]['trials'][0]['kpts_relative_depth'])
-plt.title("Turker Guess Ordering")
-plot_image(data[i]['annotations_truth']['kpts_2d'],
-           data[i]['images_truth']['filename'], label="absolute_depth",
-           kpts_3d=data[i]['annotations_truth']['kpts_3d'])
-plt.title("Ground Truth Depth")
+# plot_image(data[i]['annotations_truth']['kpts_2d'],
+#            data[i]['images_truth']['filename'], label="relative_depth",
+#            kpts_relative_depth=data[i]['annotations_truth']['kpts_relative_depth'])
+# plt.title("Ground Truth Ordering")
+# plot_image(data[i]['annotations_truth']['kpts_2d'],
+#            data[i]['images_truth']['filename'], label="relative_depth",
+#            kpts_relative_depth=data[i]['trials'][0]['kpts_relative_depth'])
+# plt.title("Turker Guess Ordering")
+# plot_image(data[i]['annotations_truth']['kpts_2d'],
+#            data[i]['images_truth']['filename'], label="absolute_depth",
+#            kpts_3d=data[i]['annotations_truth']['kpts_3d'])
+# plt.title("Ground Truth Depth")
 
-plot_3d_stickcoords(data[i]['annotations_truth']['kpts_3d'], dataset='original')
+# plot_3d_stickcoords(data[i]['annotations_truth']['kpts_3d'], dataset='original')
 
-plane = 'z'
-pts_projected = project_to_axis(data[i]['annotations_truth']['kpts_3d'], plane)
-plot_2d_stickcoords(pts_projected, plane=plane)
+# plane = 'z'
+# pts_projected = project_to_axis(data[i]['annotations_truth']['kpts_3d'], plane)
+# plot_2d_stickcoords(pts_projected, plane=plane)
 
-plt.show()
-
-
-
-# data_by_hit = postprocess_original_utils.load_data()
-# # data_by_img = group_data_by_image(data_by_hit)
-
-# images = ["human36m_train_0000044510.jpg", "human36m_train_0000408524.jpg",
-#           "human36m_train_0000668287.jpg", "human36m_train_0000167841.jpg",
-#           "human36m_train_0000465672.jpg"]
-
-# hits = postprocess_original_utils.lookup_hits_from_file_names(data_by_hit, images)
-
-# for h in hits:
-#     visualize_HIT(h, mode='coords')
-#     # visualize_HIT(h, mode='groundtruth')
 # plt.show()
-

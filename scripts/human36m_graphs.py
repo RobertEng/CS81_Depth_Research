@@ -10,11 +10,16 @@ from collections import Counter, defaultdict
 import numpy as np
 from lean_correction import correct_lean
 
+from matplotlib.patches import Circle
+import matplotlib.lines as lines
+from matplotlib.lines import Line2D
+import matplotlib.image as mpimg
+from scipy.misc import imread
 import matplotlib.pyplot as plt
 
 from constants import (HUMAN_ANNOTATION_PATH, COCO_ANNOTATION_PATH,
     HUMAN_RAW_RESULT_PATH, COCO_RAW_RESULT_PATH, KEYPTS_RELATIVE_DEPTH_PATH,
-    KEYCMPS_RESULT_PATH, HUMAN_OUTPUT_PATH)
+    KEYCMPS_RESULT_PATH, HUMAN_OUTPUT_PATH, HUMAN_IMAGES_DIR)
 
 
 def fraction_of_correct_comparisons_per_trial(data, _human_dataset, subj_id_to_yvals, plots=True):
@@ -417,10 +422,6 @@ def image_difficulty(data, _human_dataset, subj_id_to_trials, subj_id_accuracy, 
     x = np.arange(len(subjects_ranked_hard_to_easy))
     y = [subj_id_accuracy[subj_id] * 100 for subj_id in subjects_ranked_hard_to_easy]
 
-    subj_id_to_image_path = {}
-    for d in _human_dataset['images']:
-        subj_id_to_image_path[d['id']] = d['filename']
-
     print("The hardest 5 subjects are {}".format(subjects_ranked_hard_to_easy[:5]))
     hardest_paths = [subj_id_to_image_path[subj_id] for subj_id in subjects_ranked_hard_to_easy[:5]]
     print("The hardest 5 images' paths are {}".format(hardest_paths))
@@ -429,12 +430,49 @@ def image_difficulty(data, _human_dataset, subj_id_to_trials, subj_id_accuracy, 
     hardest_paths = [subj_id_to_image_path[subj_id] for subj_id in subjects_ranked_hard_to_easy[-5:]]
     print("The easiest 5 images' paths are {}".format(hardest_paths))
 
+
     if plots:
+        plt.figure(random.randint(0, 1000))
         plt.plot(x, y)
         plt.ylim(ymin=0)
         plt.xlabel('Images Sorted Hardest to Easiest')
         plt.ylabel('% of Correct Comparisons per Image')
         plt.title('Accuracy per Human3.6 Subject i.e. Image Difficulty')
         plt.grid(True)
+
+        plt.show()
+
+
+def visualize_difficult_images(data, _human_dataset, subj_id_to_trials, subj_id_accuracy, subjects_ranked_hard_to_easy):
+    subj_id_to_image_path = {}
+    for d in _human_dataset['images']:
+        subj_id_to_image_path[d['id']] = d['filename']
+
+    subj_id_to_kpts_2d = {}
+    for d in _human_dataset['annotations']:
+        subj_id_to_kpts_2d[d['id']] = d['kpts_2d']
+
+    for subj_id in subjects_ranked_hard_to_easy[:5] + subjects_ranked_hard_to_easy[-5:]:
+        image_filepath = os.path.join(HUMAN_IMAGES_DIR, subj_id_to_image_path[subj_id])
+        if not os.path.isfile(image_filepath):
+            print "Could not find {}. Please download from the server.".format(image_filepath)
+            return
+
+        xs = subj_id_to_kpts_2d[subj_id][::2]
+        ys = subj_id_to_kpts_2d[subj_id][1::2]
+
+        plt.figure(random.randint(0, 1000))
+        img = mpimg.imread(image_filepath)
+        ax = plt.axes()
+        imgplot = ax.imshow(img)
+
+        colors = ['r', 'orange', 'c', 'g', 'b']
+        for i, comp in enumerate(subj_id_to_trials[subj_id][0].keys()):
+            kpt1, kpt2 = [int(_k) for _k in comp.split(',')]
+
+            ax.add_line(Line2D([xs[kpt1], xs[kpt2]], [ys[kpt1], ys[kpt2]], linewidth=2, color=colors[i % len(colors)]))
+            ax.add_patch(Circle((xs[kpt1], ys[kpt1]), 3))
+            ax.add_patch(Circle((xs[kpt2], ys[kpt2]), 3))
+
         plt.show()
 

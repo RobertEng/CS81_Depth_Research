@@ -30,7 +30,7 @@ SKIP_ACTIONS  = ['_ALL']#,'WalkTogether','Posing','Photo','SittingDown','Directi
 SKIP_ACTIONS  = ['_ALL', 'WalkTogether','Posing','Photo','SittingDown','Directions','Purchases','Sitting','Walking','Waiting','Phoning','Smoking','WalkDog','Discussion','Eating', 'WalkingDog', 'Greeting']
 #CAMERA_IDS    = [54138969, 55011271, 58860488, 60457274]
 SUBJECT_IDS   = [1,5,6,7,8,9,11]
-SUBJECT_IDS   = [1]
+# SUBJECT_IDS   = [1]
 HUMAN_36M_KEYPOINTS = \
   ['mid_hip',
    'right_hip', 'right_knee', 'right_ankle', 'right_foot_base', 'right_foot_tip',
@@ -39,6 +39,14 @@ HUMAN_36M_KEYPOINTS = \
    'left_shoulder', 'left_elbow', 'left_wrist', 'left_wrist_2','left_palm','left_thumb','left_thumb_2',
    'neck_3',
    'right_shoulder', 'right_elbow', 'right_wrist', 'right_wrist_2','right_palm','right_thumb','right_thumb_3']
+# INTEREST_KEYPOINTS = \
+#   ['head', 'neck',
+#    'left_shoulder', 'right_shoulder',
+#    'left_elbow', 'right_elbow',
+#    'left_wrist', 'right_wrist',
+#    'left_hip', 'right_hip',
+#    'left_knee', 'right_knee',
+#    'left_ankle', 'right_ankle']
 INTEREST_KEYPOINTS = \
   ['head', 'neck',
    'left_shoulder', 'right_shoulder',
@@ -46,7 +54,8 @@ INTEREST_KEYPOINTS = \
    'left_wrist', 'right_wrist',
    'left_hip', 'right_hip',
    'left_knee', 'right_knee',
-   'left_ankle', 'right_ankle']
+   'left_ankle', 'right_ankle',
+   'mid_hip', 'mid_spine', 'chin']
 SKELETON = \
   [['head', 'neck'],
    ['neck', 'left_shoulder'], ['neck', 'right_shoulder'],
@@ -107,7 +116,8 @@ for subject_id in SUBJECT_IDS:
         action_name = action_info[0]
         action_version = int(action_info[1]) if len(action_info) > 1 else 0
 
-        if action_name in SKIP_ACTIONS: continue
+        if action_name in SKIP_ACTIONS: continue 
+        if subject_id == 9 and camera_id == 58860488: continue
         print("S%d"%subject_id, action_name, action_version, camera_id)
 
         # insert the action in the actions list if it has never been encountered

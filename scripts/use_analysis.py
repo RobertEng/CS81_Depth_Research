@@ -21,7 +21,8 @@ from human36m_graphs import (
     wrongness_distance_of_comps,
     wrongness_distance_of_metacomps,
     worker_experience_vs_accuracy,
-    image_difficulty)
+    image_difficulty,
+    visualize_difficult_images)
 
 from lean_correction import correct_lean
 from constants import (HUMAN_ANNOTATION_PATH, COCO_ANNOTATION_PATH,
@@ -126,17 +127,18 @@ for subj_id in subj_id_to_trials.keys():
 subjects_ranked_hard_to_easy = [key for key, value in sorted(subj_id_accuracy.iteritems(), key=lambda (k,v): (v,k))]
 
 
-fraction_of_correct_comparisons_per_trial(data, _human_dataset, subj_id_to_yvals)
-fraction_of_correct_comparisons_per_assignment(data, _human_dataset, subj_id_to_yvals)
-fraction_of_correct_comparisons_per_subject(data, _human_dataset, subj_id_to_yvals, subj_id_to_trials)
-fraction_of_correct_comparisons_per_hit(data, _human_dataset, subj_id_to_yvals, hit_id_to_trials)
-fraction_of_correct_comparisons_per_worker(data, _human_dataset, subj_id_to_yvals, worker_id_to_trials)
-fraction_of_correct_comparisons_per_metatrial(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials)
-fraction_of_correct_comparisons_per_metahit(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials, hit_id_to_subj_ids)
-wrongness_distance_of_comps(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials, workers_ranked_worst_to_best)
-wrongness_distance_of_metacomps(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials)
-worker_experience_vs_accuracy(data, subj_id_to_yvals, worker_id_to_trials, workers_ranked_worst_to_best, worker_accuracy)
-image_difficulty(data, _human_dataset, subj_id_to_trials, subj_id_accuracy, subjects_ranked_hard_to_easy)
+# fraction_of_correct_comparisons_per_trial(data, _human_dataset, subj_id_to_yvals)
+# fraction_of_correct_comparisons_per_assignment(data, _human_dataset, subj_id_to_yvals)
+# fraction_of_correct_comparisons_per_subject(data, _human_dataset, subj_id_to_yvals, subj_id_to_trials)
+# fraction_of_correct_comparisons_per_hit(data, _human_dataset, subj_id_to_yvals, hit_id_to_trials)
+# fraction_of_correct_comparisons_per_worker(data, _human_dataset, subj_id_to_yvals, worker_id_to_trials)
+# fraction_of_correct_comparisons_per_metatrial(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials)
+# fraction_of_correct_comparisons_per_metahit(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials, hit_id_to_subj_ids)
+# wrongness_distance_of_comps(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials, workers_ranked_worst_to_best)
+# wrongness_distance_of_metacomps(data, _human_dataset, subj_id_to_yvals, subj_id_to_metatrials)
+# worker_experience_vs_accuracy(data, subj_id_to_yvals, worker_id_to_trials, workers_ranked_worst_to_best, worker_accuracy)
+# image_difficulty(data, _human_dataset, subj_id_to_trials, subj_id_accuracy, subjects_ranked_hard_to_easy)
+visualize_difficult_images(data, _human_dataset, subj_id_to_trials, subj_id_accuracy, subjects_ranked_hard_to_easy)
 
 
 # from constants import CALTECH_OUTPUT_PATH

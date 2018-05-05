@@ -1,6 +1,8 @@
 import os
 import sys
 import json
+import random
+random.seed(420)
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -50,23 +52,72 @@ actions = ['Directions']
 
 ################################################################################
 ## ORIGINAL VIZ
-idx = None
-img_id = 279782
+# idx = None
+# img_id = 279782
+# with open( HUMAN_ANNOTATION_PATH ) as f:
+#   _human_dataset = json.load(f)
+#   correct_lean(_human_dataset)
+#   for _i, d in enumerate(_human_dataset['images']):
+#     if d['id'] == img_id:
+#       idx = _i
+#       break
+# print idx
+# i = idx
+
+# data = _human_dataset['annotations']
+# plot_image(_human_dataset['annotations'][i]['kpts_2d'],
+#            _human_dataset['images'][i]['filename'])
+# # plot_3d_stickcoords(_human_dataset['annotations'][i]['kpts_3d'])
+# plt.show()
+
+def plot_image_from_subj_and_camera(_human_dataset, subj_id, camera_id, video=None, count=1):
+  hdas, hdis = [], []
+  for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
+    if di['c_id'] == camera_id and da['s_id'] == subj_id:
+      if video is None or video == di['video']:
+        hdas.append(da)
+        hdis.append(di)
+  
+  if len(hdas) == 0:
+    print "No image for s_id {}, c_id {}".format(subj_id, camera_id)
+
+  idxes = random.sample(range(len(hdas)), min(count, len(hdas)))
+  for idx in idxes:
+    if plot_image(hdas[idx]['kpts_2d'], hdis[idx]['filename']):
+      print "s_id {}, c_id {}".format(subj_id, camera_id)
+      plt.show()
+    
+
 with open( HUMAN_ANNOTATION_PATH ) as f:
   _human_dataset = json.load(f)
   correct_lean(_human_dataset)
-  for _i, d in enumerate(_human_dataset['images']):
-    if d['id'] == img_id:
-      idx = _i
-      break
-print idx
-i = idx
 
-data = _human_dataset['annotations']
-plot_image(_human_dataset['annotations'][i]['kpts_2d'],
-           _human_dataset['images'][i]['filename'])
-plot_3d_stickcoords(_human_dataset['annotations'][i]['kpts_3d'])
-plt.show()
+# subj_id = 9
+# # videos = set()
+# for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
+#   # if di['video'] not in videos and da['s_id'] == subj_id:
+#   if di['video'] == "SittingDown 1.54138969.mp4" and da['s_id'] == subj_id:
+#     # videos.add(di['video'])
+#     if plot_image(da['kpts_2d'], di['filename']):
+#       print "s_id {}, c_id {}, video {}".format(subj_id, di['c_id'], di['video'])
+#       plt.show()
+#       break
+
+camera_ids = [54138969, 55011271, 58860488, 60457274]
+subject_ids = [1,5,6,7,8,9,11]
+for s_id in subject_ids:
+  for c_id in camera_ids:
+    plot_image_from_subj_and_camera(_human_dataset, s_id, c_id)
+
+# plot_image_from_subj_and_camera(_human_dataset, 9, 54138969, video="SittingDown 1.54138969.mp4")
+# plot_image_from_subj_and_camera(_human_dataset, 9, 55011271, video="SittingDown 1.55011271.mp4")
+# plot_image_from_subj_and_camera(_human_dataset, 9, 58860488, video="SittingDown 1.58860488.mp4")
+# plot_image_from_subj_and_camera(_human_dataset, 9, 60457274, video="SittingDown 1.60457274.mp4")
+
+# plot_image_from_subj_and_camera(_human_dataset, 9, 54138969, count=5)
+# plot_image_from_subj_and_camera(_human_dataset, 9, 58860488, count=5)
+
+
 
 ################################################################################
 ## ORIGINAL VIZ WITH TURKERS

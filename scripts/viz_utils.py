@@ -205,13 +205,18 @@ def plot_image(kpts_2d, image_filename, label=None, **kwargs):
     '''
     if label == "relative_depth" and "kpts_relative_depth" not in kwargs:
         print ("kpts_relative_depth must be passed to plot_image.")
-        return
+        return False
     elif label == "absolute_depth" and "kpts_3d" not in kwargs:
         print ("kpts_3d must be passed to plot_image.")
-        return
+        return False
 
+    try:
+        read_pic = imread(HUMAN_IMAGES_DIR + '/{}'.format(image_filename))
+    except IOError:
+        print "Download {}".format(image_filename)
+        return False
     plt.figure()
-    plt.imshow(imread(HUMAN_IMAGES_DIR + '/{}'.format(image_filename)))
+    plt.imshow(read_pic)
     xs = kpts_2d[0::2]
     ys = kpts_2d[1::2]
     plt.scatter(xs, ys)
@@ -229,7 +234,7 @@ def plot_image(kpts_2d, image_filename, label=None, **kwargs):
         for kpt_id, (x, y) in enumerate(zip(xs, ys)):
             t = plt.text(x, y, str(depths[kpt_id]), color="red", fontsize=12, size='smaller')
             t.set_bbox(dict(facecolor='green', alpha=0.5))
-
+    return True
 
 
 # def plot_image(annotation, image, groundtruth):

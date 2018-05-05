@@ -17,7 +17,8 @@ HUMAN_IMAGES_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/' \
 
 HUMAN_RAW_RESULT_FILE = "cocoa_test_completed_1000_DepthHITS_2018-04-24_09-14-49.pkl"
 COCO_RAW_RESULT_FILE = "cocoa_test_completed_2400_DepthHITS_2017-06-13_13-22-13.pkl"
-HUMAN_ANNOTATION_FILE = 'human36m_train.json'
+# HUMAN_ANNOTATION_FILE = 'human36m_train.json'
+HUMAN_ANNOTATION_FILE = 'human36m_train_17.json'
 COCO_ANNOTATION_FILE = 'person_keypoints_train2014.json'
 
 HUMAN_ANNOTATION_PATH = os.path.join(HUMAN_ANNOTATION_DIR, HUMAN_ANNOTATION_FILE)
@@ -54,6 +55,11 @@ CALTECH_OUTPUT_PATH = os.path.join(RESULT_DIR, CALTECH_OUTPUT_FILE)
 #    ['left_shoulder', 'left_hip'], ['right_shoulder', 'right_hip'],
 #    ['left_hip', 'left_knee'], ['right_hip', 'right_knee'],
 #    ['left_knee', 'left_ankle'], ['right_knee', 'right_ankle']]
+NUM_KPTS_EXPANDED = 17
+I_ORIGINAL  = np.array([1,2,2,3,4,5,6,3,4 ,9 ,10,11,12])-1 # start points
+J_ORIGINAL  = np.array([2,3,4,5,6,7,8,9,10,11,12,13,14])-1 # end points
+LR_ORIGINAL = np.array([1,1,0,1,0,1,0,1,0,1 ,0 ,1 ,0 ], dtype=bool)
+
 NUM_KPTS_ORIGINAL = 14
 I_ORIGINAL  = np.array([1,2,2,3,4,5,6,3,4 ,9 ,10,11,12])-1 # start points
 J_ORIGINAL  = np.array([2,3,4,5,6,7,8,9,10,11,12,13,14])-1 # end points

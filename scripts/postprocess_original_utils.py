@@ -109,8 +109,8 @@ def load_data(load_from_file=True, full_ordering=True):
     #   [3, 9], [8, 10], [9, 11], [10, 12], [11, 13]]}]
     for d in data:
         # Remove neck keypoint
-        d['annotations_truth']['kpts_2d'][2:4] = []
-        d['annotations_truth']['kpts_3d'][3:6] = []
+        # d['annotations_truth']['kpts_2d'][2:4] = []
+        # d['annotations_truth']['kpts_3d'][3:6] = []
         # Grab every third kpts_3d which corresponds to depth
         axis_to_sort = 1 # change this if it looks like we're sorting along the wrong axis
         d['annotations_truth']['kpts_depth'] = d['annotations_truth']['kpts_3d'][axis_to_sort::3]

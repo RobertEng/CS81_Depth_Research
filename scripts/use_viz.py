@@ -19,17 +19,17 @@ import cameras
 import data_utils
 
 
-version = 0
+# version = 0
 # i_human = 0
 # i_baseline = 0
-i = 0
+# i = 0
 # i_baseline = i_human * 5 ## DOESN"T WORK. EXAMINE THIS LATER.
 
-SUBJ_IDS = [1]
-SUBJ_IDS = [279782]
-camera_frame = False
-experimental = False
-actions = ['Directions']
+# SUBJ_IDS = [1]
+# SUBJ_IDS = [279782]
+# camera_frame = False
+# experimental = False
+# actions = ['Directions']
 # actions = ['Directions', 'Discussion', 'Eating', 'Greeting', 'Phoning', 'Photo',
 #     'Posing', 'Purchases', 'Sitting', 'SittingDown', 'Smoking', 'Waiting',
 #     'WalkDog', 'Walking', 'WalkTogether']
@@ -86,28 +86,57 @@ def plot_image_from_subj_and_camera(_human_dataset, subj_id, camera_id, video=No
     if plot_image(hdas[idx]['kpts_2d'], hdis[idx]['filename']):
       print "s_id {}, c_id {}".format(subj_id, camera_id)
       plt.show()
-    
 
 with open( HUMAN_ANNOTATION_PATH ) as f:
   _human_dataset = json.load(f)
   correct_lean(_human_dataset)
 
-# subj_id = 9
-# # videos = set()
-# for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
-#   # if di['video'] not in videos and da['s_id'] == subj_id:
-#   if di['video'] == "SittingDown 1.54138969.mp4" and da['s_id'] == subj_id:
-#     # videos.add(di['video'])
-#     if plot_image(da['kpts_2d'], di['filename']):
-#       print "s_id {}, c_id {}, video {}".format(subj_id, di['c_id'], di['video'])
-#       plt.show()
-#       break
+def plot_bad_images():
+  subj_id = 9
+  for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
+    if di['video'] == "SittingDown 1.54138969.mp4" and da['s_id'] == subj_id:
+      if plot_image(da['kpts_2d'], di['filename']):
+        print "s_id {}, c_id {}, video {}".format(subj_id, di['c_id'], di['video'])
+        plt.show()
+        break
 
-camera_ids = [54138969, 55011271, 58860488, 60457274]
-subject_ids = [1,5,6,7,8,9,11]
-for s_id in subject_ids:
-  for c_id in camera_ids:
-    plot_image_from_subj_and_camera(_human_dataset, s_id, c_id)
+def plot_all_cameras_and_subjs():
+  camera_ids = [54138969, 55011271, 58860488, 60457274]
+  subject_ids = [1,5,6,7,8,9,11]
+  for s_id in subject_ids:
+    for c_id in camera_ids:
+      plot_image_from_subj_and_camera(_human_dataset, s_id, c_id)
+
+def save_all_annotated():
+  videos = {}
+  for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
+    subj_id = da['s_id']
+    
+    if (di['video'], subj_id) not in videos:
+      # Save random frame on first encounter
+      if plot_image(da['kpts_2d'], di['filename']):
+        fname = '.'.join(di['video'].split('.')[:-1]) + "_" + str(subj_id) + "_" + str(di['frame']) + "_random_" + di['filename']
+        plt.savefig('/Users/Robert/Documents/Caltech/CS81_Depth_Research/datasets/human36m_images_17_annotated/' + fname)
+        plt.close()
+      videos[(di['video'], subj_id)] = di['frame']
+    
+    if di['frame'] < videos[(di['video'], subj_id)]:
+      videos[(di['video'], subj_id)] = di['frame']
+
+  for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
+    subj_id = da['s_id']
+    if videos[(di['video'], subj_id)] == di['frame']:
+      if plot_image(da['kpts_2d'], di['filename']):
+        fname = '.'.join(di['video'].split('.')[:-1]) + "_" + str(subj_id) + "_" + str(di['frame']) + "_last_" + di['filename']
+        plt.savefig('/Users/Robert/Documents/Caltech/CS81_Depth_Research/datasets/human36m_images_17_annotated/' + fname)
+        plt.close()
+
+
+
+for da, di in zip(_human_dataset['annotations'], _human_dataset['images']):
+  if di['filename'] == 'human36m_train_0000055050.jpg':
+    plot_image(da['kpts_2d'], 'human36m_train_0000055050.jpg')
+    plt.show()
 
 # plot_image_from_subj_and_camera(_human_dataset, 9, 54138969, video="SittingDown 1.54138969.mp4")
 # plot_image_from_subj_and_camera(_human_dataset, 9, 55011271, video="SittingDown 1.55011271.mp4")

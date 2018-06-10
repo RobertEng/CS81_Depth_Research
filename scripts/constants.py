@@ -12,8 +12,10 @@ COCO_ANNOTATION_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/'  \
                       'datasets/mscoco_annotations'
 # HUMAN_ANNOTATION_DIR = '/home/ubuntu/datasets/human3.6/annotations'
 # COCO_ANNOTATION_FILE = '/home/ubuntu/datasets/mscoco/annotations'
+# HUMAN_IMAGES_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/' \
+#                    'datasets/human36m_images'
 HUMAN_IMAGES_DIR = '/Users/Robert/Documents/Caltech/CS81_Depth_Research/' \
-                   'datasets/human36m_images'
+                   'datasets/human36m_images_17'
 
 HUMAN_RAW_RESULT_FILE = "cocoa_test_completed_1000_DepthHITS_2018-04-24_09-14-49.pkl"
 COCO_RAW_RESULT_FILE = "cocoa_test_completed_2400_DepthHITS_2017-06-13_13-22-13.pkl"

@@ -1,4 +1,5 @@
 ## imports
+import os
 from os import listdir
 import json, sys
 import numpy as np
@@ -19,6 +20,7 @@ import matplotlib.patches as patches
 DATASET_DIR      = '../datasets/human36m_original'
 ANNOTATIONS_DIR  = '../datasets/human36m_annotations'
 IMAGES_DIR       = '../datasets/human36m_images'
+IMAGES_17_DIR    = '../datasets/human36m_images_17'
 
 ## dataset constants
 FEATURE_TYPES = ['D2_Positions','D3_Positions_mono', 'D3_Positions_mono_universal']
@@ -112,6 +114,16 @@ human36m['pose']       = [pose]
 PADDED   = []
 USED_IDS = set()
 
+# # Load previous dataset to line up previous image files with this new one.
+# from constants import HUMAN_ANNOTATION_DIR
+# with open(os.path.join(HUMAN_ANNOTATION_DIR, "human36m_train.json")) as f:
+#         _human_dataset = json.load(f)
+
+# video_frame_camera_to_data = {}
+# for d in _human_dataset['images']:
+#     video_frame_camera_to_data[(d['video'], d['frame'], d['c_id'])] = d
+
+
 for subject_id in SUBJECT_IDS:
     VIDEOS_DIR   = '%s/S%d/MyVideos'%(DATASET_DIR, subject_id)
     FEATURES_DIR = '%s/S%d/MyPoseFeatures'%(DATASET_DIR, subject_id)
@@ -178,12 +190,12 @@ for subject_id in SUBJECT_IDS:
         # assumption is that they are alligned at beginning and the final
         # frames get discarded.
         
-        ################### UNCOMMENT FOR FAST CREATION
-        # frame_nums = range(0, shapes[0], SKIP_FRAMES)
-        # frame_nums = random.sample(frame_nums, len(frame_nums) * (1500 / 105812) + 1)
-        # for frame_num in frame_nums:
         ################### COMMENT FOR FAST CREATION
-        while frame_num < shapes[0]:
+        # while frame_num < shapes[0]:
+        ################### UNCOMMENT FOR FAST CREATION
+        frame_nums = range(0, shapes[0], SKIP_FRAMES)
+        frame_nums = random.sample(frame_nums, len(frame_nums) * 3000 / 105812 + 1)
+        for frame_num in frame_nums:
             frame   = frames.get_data(frame_num)
 
             # 2d pose associated with that frame
@@ -260,8 +272,10 @@ for subject_id in SUBJECT_IDS:
             # plt.show()
 
             rand_id       = random.randint(0,999999)
+            # rand_id       = video_frame_camera_to_data[(video_filename, frame_num, camera_id)]['id']
             while rand_id in USED_IDS:
                 rand_id       = random.randint(0,999999)
+                print "bad"
             USED_IDS.add(rand_id)
 
             annotation_id = rand_id
@@ -287,9 +301,9 @@ for subject_id in SUBJECT_IDS:
             image['frame']    = frame_num
             human36m['images'].append(image)
 
-#             # save the image
-#             image_filename = '%s/human36m_train_%010d.jpg'%(IMAGES_DIR,image_id)
-#             imageio.imwrite(image_filename, crop)
+            # save the image
+            image_filename = '%s/human36m_train_%010d.jpg'%(IMAGES_17_DIR,image_id)
+            imageio.imwrite(image_filename, crop)
 
             if pad_left + pad_top != 0:
                 PADDED.append(image_id)

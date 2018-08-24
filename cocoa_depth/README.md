@@ -17,6 +17,14 @@ To run the server, run `mongod --dbpath ./data/db`.
 For the configuration of routes in `/etc/nginx/sites-enabled/default`, use the `default` file in the repo as an example.
 
 # Starting the Server
+
+### Local Server
+Run the server.
+```
+python pythonServer_v6.py
+```
+
+### Remote Server
 Start a screen and start the flask server.
 ```
 screen -S cocoa_depth
@@ -27,6 +35,7 @@ Leave the screen (`Ctrl+A+D`) and change the owner of the server socket.
 ```
 sudo chown -R www-data:www-data /tmp/uwsgi_mturk_cocoa_depth.sock
 ```
+
 
 ### Querying Mongodb
 Here's a couple code snippets to get started in ipython. The first code block here is for querying the Human3.6m data.

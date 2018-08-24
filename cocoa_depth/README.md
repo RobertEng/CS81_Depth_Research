@@ -1,39 +1,37 @@
-# SSH into the Server
-```
-ssh -i aws-ec2-reng.pem ubuntu@ec2-52-10-138-92.us-west-2.compute.amazonaws.com
-```
-
-# Setting Up and Running the Server
+# Setup
 The GUI is run using python Flask backend with MongoDB as the database. Routing is done with nginx.
 
-Start a new screen with `screen -S helloAWS` and start the helloAWS flask server in hello.py. Notice the file is named hello.py and thus the --module hello and the Flask app is called app in hello.py thus the --callable app.
+
+### Setup Mongodb
+MongoDB is used to store the data during development and as a backup to AMT.
+
+Install MongoDB from [here](https://docs.mongodb.com/manual/installation/). Create the folder where you want the db to live.
 ```
-sudo uwsgi --module hello --callable app -s /tmp/uwsgi_root.sock
-```
-To exit the screen, Ctr+A+D. You must also change the owner of the socket.
-```
-sudo chown -R www-data:www-data /tmp/uwsgi_root.sock
+mkdir -p /data/db
 ```
 
-Start another screen with `screen -S cocoa_depth` and start the cocoa_depth flask server.
+To run the server, run `mongod --dbpath ./data/db`.
 
-```
-sudo uwsgi --module pythonServer_v6 --callable app -s /tmp/uwsgi_mturk_cocoa_depth.sock
-sudo chown -R www-data:www-data /tmp/uwsgi_mturk_cocoa_depth.sock
-```
+### Setup Locally
+
+
+### Setup Remotely
 
 Check `/etc/nginx/sites-enabled/default` for the configuration of these routes.
 
-# Mongodb
-The purpose of MongoDB is to provide a place to store all the data and such during development.
-
-## Local Mongodb
-Run from directory `~/Documents/Caltech/EE148/ee148project`. I don't remember, but I might've had to make the data and the db folders.
+# Starting the Server
+Start a screen and start the flask server.
 ```
-mongod --dbpath ./data/db
+screen -S cocoa_depth
+sudo uwsgi --module pythonServer_v6 --callable app -s /tmp/uwsgi_mturk_cocoa_depth.sock
 ```
 
-## Querying Mongodb
+Leave the screen (`Ctrl+A+D`) and change the owner of the server socket.
+```
+sudo chown -R www-data:www-data /tmp/uwsgi_mturk_cocoa_depth.sock
+```
+
+### Querying Mongodb
 Here's a couple code snippets to get started in ipython. The first code block here is for querying the Human3.6m data. The second code block is querying the MSCOCO data.
 ```python
 import json

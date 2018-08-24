@@ -2,7 +2,7 @@
 The GUI is run using python Flask backend with MongoDB as the database. Routing is done with nginx.
 
 
-### Setup Mongodb
+### MongoDB Setup
 MongoDB is used to store the data during development and as a backup to AMT.
 
 Install MongoDB from [here](https://docs.mongodb.com/manual/installation/). Create the folder where you want the db to live.
@@ -12,12 +12,9 @@ mkdir -p /data/db
 
 To run the server, run `mongod --dbpath ./data/db`.
 
-### Setup Locally
+### Remote Setup
 
-
-### Setup Remotely
-
-Check `/etc/nginx/sites-enabled/default` for the configuration of these routes.
+For the configuration of routes in `/etc/nginx/sites-enabled/default`, use the `default` file in the repo as an example.
 
 # Starting the Server
 Start a screen and start the flask server.
@@ -32,7 +29,7 @@ sudo chown -R www-data:www-data /tmp/uwsgi_mturk_cocoa_depth.sock
 ```
 
 ### Querying Mongodb
-Here's a couple code snippets to get started in ipython. The first code block here is for querying the Human3.6m data. The second code block is querying the MSCOCO data.
+Here's a couple code snippets to get started in ipython. The first code block here is for querying the Human3.6m data.
 ```python
 import json
 import sys
@@ -90,23 +87,22 @@ for document in cursor:
 ```
 
 # Amazon Mechanical Turk
-Click on My Account. The menu shows how much money is left in this account i.e. $521.11.
 
-## AMT Sandbox
-Always test on sandbox first before deploying. Go to https://requestersandbox.mturk.com/ and sign in as a requester.
-Click on Manage menu. Click on Manage Hits Individually. This is where you see each hit individually.
 
-## Mturk Functions
-All the important information is in the function getHITType in mturk_api. To create hits, run the mturk_api function createHITS() in ipython.
+### Mturk Functions
+To create hits, run the `mturk_api` method `createHITS()` in ipython.
 ```python
 from mturk_api import mturk_depth_api
 mturk_depth_api.createHITs()
-
+```
+To delete hits, call the `deleteAllHits()` method.
+```python
 mturk_depth_api.deleteAllHits()
 ```
 
-## Deploying to AMT
-When deploying checklist:
+### Deploying to AMT checklist
+* Make sure you have money in your account.
+* Always test on sandbox first before deploying.
 * change MAX_HITS in mturk_depth_api to 800 or 100 or whatever.
 * Change the url setup for mechanical turk.
 * Change the external_url in createHITs to appropriate route.
@@ -116,35 +112,7 @@ When deploying checklist:
 * Change the url in the GUI html form between sandbox and normal. 
 * Make sure to reload the mturk_api into ipython after making changes.
 
-Process to deploy:
-* Always test on sandbox first.
-* Sign in as requester. Sign in as mronchi@caltech.edu and password blah. Go to manage, manage hits individually.
-* from within the server, look into mturk_api file. Do the deploy checklist from above.
-* Navigate to the directory of the app or whatever. Open up an ipython and run the api stuff like createhits.
-* Check on the sandbox it worked.
-* Then delete all the sandbox hits after you make sure it works.
-
-When they are deployed, you have to process and manage them. 
-* getReviewableHITs is if all 3 assignments have been completed.
-* getReviewableAssignments works if you complete a assignments.
-* mturk_depth_api processAssignments() and get all that data.
-* For each assignment you pull, there is an assignment id.
-* If you want to check stuff in the mturk api, go to boto mturk api. Some cloudhackers stuff.
-
-Go to /etc/nginx/sites_enabled/default and do something?  
-
-Timeline
-* Deployed Tuesday 11:13pm, $0.04. Restarted with $0.05 around midnight.
-* Deleted and restarted with $0.06 at 10am on wedenesday.
-* Deleted and restarted with 100 HITS at $0.07 at 11am.
-* No results in anything. Redid everything with https. Redeployed 100 hits on Wednesday 5pm. ~32 hits were done of 300 from 5-6pm.
-* 6-9pm, seems to be done with 160 hits of 300.
-* 430 assignments at 2:30pm. 438 at 3:00. THAT RATE IS SO SLOW??? O.o
-
-Running mturk_depth_api processAssignments() at friday 4am. generating at /home/ubuntu/amt_guis/cocoa_depth/hits/coco/cocoa_test_completed_658_DepthHITS_2017-06-09_11-06-29.pkl
-Running mturk_depth_api_human processAssignments() at friday 4am. generating at /home/ubuntu/amt_guis/cocoa_depth/hits/human/cocoa_test_completed_50_DepthHITS_2017-06-09_11-12-18.pkl
-
-
-
-
-
+### Process results
+* `processAssignments()` to process and package the results. It generates a pickle file.
+* `getReviewableHITs()` gets all the reviewable hits (all assignments are complete).
+* `getReviewableAssignments()` gets all the completed assignments.
